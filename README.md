@@ -23,7 +23,7 @@ path = /backup
 #虚拟用户
 useradd -M -s /sbin/nologin rsync
 id rsync
-#创建rsync.passwd
+#创建rsync.passwd,密码文件都是600权限,不然你用不了
 cat > /etc/rsync.passwd << EOF
 chmod 600 /etc/rsync.passwd
 EOF
@@ -41,5 +41,6 @@ shift+4末尾
 shift+6首航
 #::走rsync服务；avz万能参数；
 rsync -avz rsync_backup@10.0.0.41::backup ./
+
 
 ```
