@@ -1,0 +1,27 @@
+yum install rsync -y
+
+cat>/etc/rsyncd.conf<<EOF
+uid = rsync
+gid = rsync
+port = 873
+fake super = yes
+use chroot = no
+max connections = 200
+timeout = 600
+ignore errors
+read only = false
+list = false
+auth users = rsync_backup
+secrets file = /etc/rsync.passwd
+log file = /var/log/rsyncd.log
+[backup]
+path = /backup
+EOF
+
+cat>/etc/rsync.passwd<<EOF
+rsync_backup:123456
+EOF
+chmod 600 /etc/rsync.passwd
+useradd -M -s /sbin/nologin rsync
+mkdir /backup
+chown rsync.rsync /backup
