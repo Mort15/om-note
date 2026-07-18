@@ -1,5 +1,6 @@
 # om-note
-2026年7月18日
+```bash
+#2026年7月18日
 #rsyncd.conf 企业常用配置
 [root@backup ~]#cat /etc/rsyncd.conf
 uid = rsync
@@ -41,3 +42,4 @@ shift+6首航
 #::走rsync服务；avz万能参数；
 rsync -avz rsync_backup@10.0.0.41::backup ./
 
+```
