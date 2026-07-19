@@ -7,3 +7,4 @@ set smtp-auth-password=#客户端授权码
 set smtp-auth=login
 set ssl-verify=ignore
 set nss-config-dir=/etc/pki/nssdb/
+#注意这里的--------------是不一样的，有编码问题
