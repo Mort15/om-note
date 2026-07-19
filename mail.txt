@@ -1,0 +1,9 @@
+/etc/mail.rc
+#追加内容
+set from=2014145559@qq.com
+set smtp=smtps://smtp.qq.com:465
+set smtp-auth-user=2014145559@qq.com
+set smtp-auth-password=#客户端授权码
+set smtp-auth=login
+set ssl-verify=ignore
+set nss-config-dir=/etc/pki/nssdb/
