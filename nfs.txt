@@ -1,0 +1,15 @@
+#Server
+yum install nfs-utils -y
+useradd -M -s /sbin/nologin nfs
+id nfs #取uid gid号
+mkdir -p /mnt/nfs_share/
+chown nfs.nfs /mnt/nfs_share/
+vim /etc/exportfs
+/mnt/nfs_share/ 192.168.0.0/24(rw,sync,all_squash,anonuid=1000,anongid=1000,insecure)
+exportfs -ra
+systemctl restart nfs
+#Client
+yum install nfs-common -y
+mkdir nfs_tmp
+mount 192.168.0.241:/mnt/nfs_share /nfs_tmp
+
