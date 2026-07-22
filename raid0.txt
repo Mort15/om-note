@@ -1,0 +1,8 @@
+
+1，机械硬盘加速卡 傲腾，也可以用普通SSD替代
+2，amd的storemi类似raid0
+3，primocache
+4，❌expresscache伤盘不用
+5，组raid0
+6，intel官方的工具
+
