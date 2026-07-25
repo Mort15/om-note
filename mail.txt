@@ -7,4 +7,68 @@ set smtp-auth-password=#客户端授权码
 set smtp-auth=login
 set ssl-verify=ignore
 set nss-config-dir=/etc/pki/nssdb/
-#注意这里的--------------是不一样的，有编码问题
+#注意这里的--------------有编码问题
+
+
+AI生成的练习题
+
+题目 1（基础发送）
+
+使用 mail 命令，向用户 zhangsan@example.com 发送一封邮件，正文内容为 "Hello, this is a test."。要求不进入交互式编辑，直接在命令行完成。
+
+echo "Hello, this is a test."|mail zhangsan@example.com
+
+题目 2（指定主题）
+
+向 lisi@example.com 发送邮件，主题为 "Meeting Reminder"，正文为 "Please attend the 10am meeting."。
+
+echo "Please attend the 10am meeting." | mail -s "Meeting Reminder" lisi@example.com
+
+题目 3（从文件读取正文）
+
+将当前目录下的 report.txt 文件内容作为邮件正文，发送给 wangwu@example.com，主题为 "Monthly Report"。
+
+mail -s "Monthly Report" wangwu@example.com < report.txt
+
+题目 4（发送给多个收件人）
+
+同时发送邮件给 a@example.com 和 b@example.com 两个收件人，主题为 "Update"，正文为 "System updated successfully."。
+
+echo "System updated successfully."|mail -s "Update" a@example.com b@example.com
+
+题目 5（添加抄送 Cc）
+
+向 main@example.com 发送邮件，主题为 "Project Status"，正文为 "All tasks completed."，同时抄送给 cc@example.com。
+
+echo "All tasks completed."|mail -s "Project Status" main@example.com -c cc@example.com
+
+题目 6（带附件发送）
+
+将当前目录下的 photo.jpg 文件作为附件，发送给 attach@example.com，主题为 "Vacation Photo"，正文为 "See the attached photo."。提示：纯 mail 命令不支持附件，需使用 uuencode 与 mail 组合实现。
+
+echo "See the attached photo.";uuencode photo.jpg photo.jpg |mail -s "Vacation Photo" attach@example.com
+
+
+题目 7（从管道获取正文）
+
+使用 echo 或 cat 将字符串 "Backup completed at 2026-07-23" 通过管道传递给 mail 命令，发送给 admin@example.com，主题为 "Backup Log"。
+
+echo "Backup completed at 2026-07-23" | mail -s "Backup Log" admin@example.com
+
+题目 8（设置发件人地址）
+
+使用 mail 命令发送邮件时，显式指定发件人（From）为 sender@mycompany.com，发送给 receiver@example.com，主题为 "Official Notice"，正文为 "Please review."。
+
+echo "Please review."|mail -s "Official Notice" receiver@example.com -- -f sender@mycompany.com
+
+题目 9（发送 HTML 格式邮件）
+
+发送一封内容为 <h1>Hello</h1><p>This is HTML mail.</p> 的邮件给 html@example.com，主题为 "HTML Test"，并要求收件方识别为 HTML 格式（需设置 Content-Type 头）。
+
+略过。
+
+题目 10（发送时添加额外的邮件头）
+
+向 header@example.com 发送邮件，主题为 "Priority"，正文为 "Urgent matter"，同时增加一个自定义邮件头 X-Priority: 1（表示高优先级）。
+
+略过。

@@ -1,0 +1,373 @@
+BV1ov41187bq
+人每天醒来需要有一个刺激他起床的理由
+==============基础篇==============
+---------------------------------
+nginx更新
+nginx -g "pid /logs/abc.pid;" # 指定pid文件位置，也可以去conf里指定
+nginx -s stop # 会去默认/usr/local/nginx/logs/nginx.pid ; ps + kill -TERM pid关
+
+nginx服务信号升级:
+#把新nginx替换旧的nginx
+mv /usr/local/nginx/sbin/nginx /usr/local/nginx/sbin/nginxold
+cp /nginx/core/nginx-1.16.1/objs/nginx /usr/local/nginx/sbin/nginx
+
+#生成nginx.pid.oldbing
+kill -USR2 $(cat /usr/local/logs/nginx.pid)
+#退掉oldbin
+kill -QUIT $(cat /usr/local/logs/nginx.pid.oldbin)
+#这时候就完成版本升级了
+
+nginx更好的升级:
+mv ./nginx ./nginxold
+#假如已经编译好./objs/nginx
+#在nginx-1.16.1目录，在objs父目录
+make upgrade
+#可以看到make会自动发送 USR2 和 QUIT
+
+说了这么多，都不如官方一句:
+make && make install && make upgrade
+
+---------------------------------
+
+#全局块
+worker_processes 1;
+
+#events块
+events {
+	worker_connections 1024;
+}
+
+#http块
+http {
+	include mime.types;
+	default_type application/octet-stream;
+	sendfile on;
+	keepalive_timeout 65;
+
+	#server块
+	server {
+		listen 80;
+
+		server_name localhost;
+		
+		#location块
+		location / {
+			root html;
+			index index.html index.htm;
+		}
+
+		error_page 500 502 503 504 /50x.html;
+		location = /50x.html {
+			root html;
+		}
+
+		error_page 404 /404.html;
+		location = /404.html {
+			root html;
+		}
+	}
+}
+
+---------------------------------
+
+
+./logs/nginx.pid是master的pid。
+crit 临界
+alert 警报
+emerg 紧急
+events {
+	accept_mutex on;#设置nginx网络连接序列化，解决惊群问题
+	#惊群：多个work进程去抢同一个连接
+	multi_accept on; #允许多个连接
+	worker_connections 512; #最大连接数,和操作系统支持文件句柄数量有关
+	use_method; #选择事件驱动处理网络信息, io多路复用:select poll epoll kqueue 默认用epoll 2.6内核以上。
+}
+
+编译时安装:
+--with-select_module
+--with-poll_module
+
+编译时移除:
+--without-select_module
+--without-poll_module
+
+events {
+	accept_mutex on;
+	multi_accept on;
+	use epoll;
+	worker_connections 1024;
+}
+
+
+---------------------------------
+
+
+sendfile on; #大大提升nginx处理静态资源的性能
+keepalive_timeout 75; #设置长连接的超时时间。
+keepalive_requests 100; #设置长连接的使用次数
+
+---------------------------------
+
+自定义日志
+#access_log logs/access.log combined;
+#定义格式
+log_format myformat '==============>This is My format';
+#指定格式
+access_log logs/my.log myformat;
+
+==============进阶篇==============
+#简单一个nginx练习
+user www;
+worker_processes 2;
+error_log logs/error.log
+pid logs/nginx.pid;
+#daemon on; 默认就是守护进程模式
+
+events {
+	accept_mutex on; #解决惊群现象
+	multi_accept on; #同时接收多个请求
+	worker_connections 1024; #连接数上限
+	use epoll; #驱动模型
+}
+
+http {
+	sendfile on; #处理静态文件的效率
+	keepalive_timeout 65; #超时时间
+
+	#log_format server1 'xxxxxxx';
+	#log_format server2 'xxxxxxx';
+	include /home/www/conf.d/*.conf;
+
+}
+
+#server1.conf
+	server {
+		listen 8081;
+		server_name localhost;
+		access_log /home/www/myweb/server1/logs/access.log
+		location /server1/location1{
+			root /home/www/myweb;
+			index index01.html;
+		}
+		location /server1/locatino2{
+			root /home/www/myweb;
+			index index02.html
+		}
+		error_page 404 /404.html;
+		localtion = /404.html {
+			root /home/www/myweb;
+			index 404.html;
+		}
+	}
+
+#server2.conf
+	server {
+		listen 8082;
+		server_name localhost;
+		access_log /home/www/myweb/server1/logs/access.log
+		location /server1/location1{
+			root /home/www/myweb;
+			index index01.html;
+		}
+		location /server1/locatino2{
+			root /home/www/myweb;
+			index index02.html
+		}
+		error_page 404 /404.html;
+		localtion = /404.html {
+			root /home/www/myweb;
+			index 404.html;
+		}
+	}
+---------------------------
+#nginx改成系统服务方式
+vim /usr/lib/systemd/system/nginx.service
+[Unit]
+#略，描述和文档。
+After=network.target #表示当前服务在指定的服务之后启动
+
+[Service]
+Type=forking #最常用的类型，似乎是"长时间执行"都用这个。
+PIDFile #指定pid路径
+ExecStartPre #启动之前执行命令
+ExecStart #systemctl start 命令
+ExecReload #systemctl restart 命令
+ExecStop #systemctl stop 命令
+#
+#服务会在启动时创建一个独立的临时目录,服务停止时，该目录会自动删除
+PrivateTmp=true 
+
+[Install]
+#
+#服务将在系统启动到 default.target 所指向的目标时启动
+wantedBy=default.target
+
+chmod 755 /usr/lib/systemd/system/nginx.service
+
+#添加nginx环境变量在profile
+vim /etc/profile
+export PATH=$PATH:/usr/local/nginx/sbin
+
+#差异environment;bashrc;profile;
+文件路径               | 生效范围   | 是否支持$扩展 | 加载时机
+----------------------|-----------|-------------|---------------------------
+~/.bashrc             | 当前用户   | 是          | 交互式非登录终端
+~/.profile            | 当前用户   | 是          | 登录Shell（兼容性最好）
+~/.bash_profile       | 当前用户   | 是          | 登录Shell（优先于.profile）
+~/.bash_login         | 当前用户   | 是          | 登录Shell（优先于.profile，次于.bash_profile）
+/etc/profile          | 所有用户   | 是          | 系统全局登录Shell
+/etc/bash.bashrc      | 所有用户   | 是          | 系统全局Bash交互式终端
+/etc/profile.d/*.sh   | 所有用户   | 是          | 登录Shell（推荐拆分脚本）
+/etc/environment      | 所有用户   | 否          | 系统启动/登录（语法严格）
+~/.pam_environment    | 当前用户   | 否          | PAM登录（极少用，语法严格）
+
+=======================
+
+server_name 和 listen 都可以区分不同网站
+listen 127.0.0.1:8000 #不同ip;不同端口;
+server_name _; #_表示所有;主要写域名;
+
+server_name 星号不能出现在中间;
+*.aliyun.com和aliyun.*是对的;
+
+#\w 表示匹配任意字母、数字或下划线的字符
+server_name ~^www\.(\w+)\.com;
+$1 引用第一个括号匹配的内容
+return 200 $1 $2;
+
+#这样可以输出文本
+return 200 'hahahaha';
+
+listen 80 default_server 和 listen 80 的区别
+第一个被加载的 server 块，是default_server。
+或者用default_server手动指定默认。
+
+加default_type text/plain;，不继承上层块。
+如果没有可以继承的default_type，那么默认就是text/plain
+
+为什么是text/plain？
+text是大类
+plain是text当中没有任何元数据的纯文本。
+plain还有一层隐含语义:“这份内容是给人眼直接阅读的”。
+plain老老实实把字符打印出来，千万别解析
+application/octet-stream 别打开，直接让用户下载保存
+
+---------------------------
+
+= 不包含正则表达式
+~ 包含正则表达式，区分大小写
+~* 不区分大小写
+
+^~ 主要用在正则表达式的uri。加上:一旦匹配到，就不会向后搜索了。；不加:先向后搜索。
+
+alias 目录别名
+root 最上层目录
+location 路径以/结尾 => alias 也必须以/结尾
+而root随意
+
+---------------------------
+index 设置默认首页
+error_page用法:
+#error_page 404 https://4399.com; #404时去访问4399.com
+error_page 404 /haha.html
+#这里上下两行的/haha.html没有任何关联。
+error_page 500 /haha.html
+location /haha.html {
+	root html;
+	#root 可以指定相对路径。这里的html其实是./html
+	#这里的真实参照物是：--prefix 安装时的路径
+}
+#@jump_to_error 不会改变URI
+error_page 404 @jump_to_error;
+location @jump_to_error{
+	default_type text/plain;
+	return 404 "Hahahahahahaha";
+}
+
+#=状态码用法:
+error_page 404 =200 /hahaha.html #把404状态码转换成200 并且跳转到hahaha.html   注意404后面有空格，等于号后没有空格
+
+---------------------------
+#静态优化: 
+sendfile on; #启动大货车，一次拉一堆。代价是拉的频率慢了。
+tcp_nopush on; #搭配sendfile on; 提升网络包传输
+tcp_nodeplay on; #keep-alive提升实时性;
+NGINX有缓存区的概念，可以tcp_nopush，也可以tcp_nodeplay。默认tcp_nodeplay，有就发。
+
+gzip on;  #一共9个命令
+
+#gzip_types *; #按照实际情况设置
+gzip_types application/javascripts text/html text/css application/json;
+
+gzip_comp_leve 6; #压缩等级，不是越高越好，边缘效应 1~9
+
+gzip_vary on; #请求头告诉对方，数据经过gzip处理
+
+gzip_buffers 4 16k; #申请的缓存空间个数和大小 默认就好
+
+gzip_disable "MSIE [1-6]\."; #通过正则匹配ua头 来启动或者关闭
+
+gzip_http_version 1.1; #指定启用gzip的最低http版本
+
+gzip_min_length 1024; #通过文件大小拍启动或关闭
+
+#gzip_proxied off;#nginx作为反向代理服务器返回数据的条件
+
+nginx_gzip.conf
+gzip on;
+gzip_types *;
+gzip_com_level 6;
+gzip_min_length 1024;
+gzip_buffers 4 16k;
+gzip_http_version 1.1;
+gzip_vary on;
+gzip_disable "MSIE [1-6]\.";
+gzip_proxied off;
+
+---------------------------
+#gzip压缩 and sendfile大货车 冲突的共存问题。
+gzip_static on; #ngx_http_gzip_static_module 默认不编译
+#[emerg] unknown directive "gzip_static"  编译时没有模块的报错信息
+
+#编译nginx，添加一个http_gzip_static_module模块
+nginx -V #复制保存一份现在的 --prefix
+mv nginx nginxold
+make clean
+./configure --with-http_gzip_static_module
+make
+cp new-nginx ./sbin/nginx
+make upgrade
+
+---------------------------
+HTTP页面缓存相关头信息，服务器判断发送新旧。
+Expires	日期，会影响 Cache-Control
+Cache-Control	配置信息
+Last-Modified	最后修改时间
+ETag	不懂，反正MD5值属于这里，好像是索引文件用的。
+
+location ~ .*\.(html|js|css|png)$ {
+	expires 1000; #缓存1000秒
+	expires -1000; #(影响Cache-Control)配置过期缓存，会对比本地和服务器是否有变化。
+	expires max; #十年
+	add_header Cache-Control no-store; #主动设置，不缓存，每次都是新数据，有很多选项
+}
+
+---------------------------
+同源策略。[协议+ip+端口+域名]相同，才是同源，是浏览器的安全策略。
+F12 - Console - RedWord: 'xxx' from origin 'xxx'
+#add_header Access-Control-Allow-Origin *;
+add_header Access-Control-Allow-Origin http://xxxxx,xxxxx;
+add_header Access-Control-Allow-Methods GET,POST,PUT,DELETE;
+
+
+防盗
+
+location ~ .*\.(png|jpg|gif)$ {
+	valid_referers none blocked www.baidu.com;
+	if ($invalid_referer){
+		return 403;
+	}
+	root html/images;
+}
+
+=======================
