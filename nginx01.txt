@@ -685,4 +685,383 @@ proxy_buffer_size 4 32k;
 proxy_busy_buffers_size 64k;
 proxy_temp_file_write_size 64k;
 =======================
+插曲{
+APACHE 每次修改都写版权说明
+BSD 不能随便取名
+MIT 完全放开
+修改后不能闭源的:LGPL GPL Mozilla
+
+一定要精通 iptables，nginx，MySQL配置
+一定要会配 Nginx+Keepalived+LVS #完美补充 Nginx
+一定要会用 JumpServer和Zabbix #“生产力”
+最后，在底子十分雄厚后，去学ansible和k8s
+
+#剩下 rsync已经掌握 tomcat不见得能用到 
+#shell python | gitlab jenkins 辅助开发部门
+#分布式/云原生:
+	最初学习时并非重点{ES ceph}
+	不可能避开:{Prometheus k8s}
+
+负载均衡和网络:
+物理层, 网卡, 链路聚合
+交换机, 交换机, 链路聚合
+路由器, 路由, 等价多路径ECMP
+传输层, F5, HAProxy, LVS
+会话层, 传输过来要建立会话
+表示层, 建立会话要有翻译官
+应用层, F5，HAProxy, NGINX
+
+负载均衡领域, 现实只谈“四层负载均衡（L4）”和“七层负载均衡（L7）”
+第5、6层是理论模型, 没有独立存在的产品形态。
+二层用mac
+三层用虚拟ip
+四层速度比七层快
+LVS四层+NGINX七层 LVS顶住压力，Nginx更灵活的配置
+Haproxy和F5在四层和七层都有
+Nginx七层用的最多
+
+}
+
+firewall-cmd --permanent --add-port=9001-9003/tcp
+--remove-port
+--query-port
+--reload
+
+#负载均衡属于横向扩展
+横向扩展:集群扩容，水平伸缩。
+纵向扩展:单点升级，垂直扩容。
+1 node -> 10 node 面更大
+1 node -> 1 node_pro 单点更强
+
+#运行OSI层次
+LVS-4 NGINX-7
+
+#定义虚拟服务池
+upstream backend { 
+	127.0.0.1:81;
+	127.0.0.1:82;
+	127.0.0.1:83;
+}
+server {
+	listen 8083;
+	server_name localhost;
+	location / {
+		proxy_pass http://backend;
+	}
+}
+
+
+负载均衡5+1个状态:
+默认:amx_fails 1;fail_timeout 10;max_counns 0;
+down #手动指定成失效的,或者fail_timeout也可以
+backup #手动指定成备用的
+max_fails=1 fail_timeout=10; #失败1次,cd=10
+max_connes #最大并发连接数上限
+
+负载均衡5+1个策略:
+默认轮询
+weight
+ip_hash
+least_conn
+url_hash
+fair
+
+down
+backup
+max_fails=1 fail_timeout=10;
+max_connes
+
+weight
+ip_hash
+least_conn
+url_hash
+fair #这是第三方模块
+
+#url_hash 配合缓存命中
+upstream hash_list {
+	#hash $request_uri; #动态的uri，地址发生变化，服务器就会发生变化。
+	fair;
+	server 192.168.0.1:80;
+	server 192.168.0.2:80;
+	server 192.168.0.3:80;
+}
+
+#安装第三方负载均衡fair
+wget https://github.com/gnosek/nginx-upstream-fair
+unzip *.zip #解压出来
+mv ng*master fair #重命名
+./configure --add-module=/root/nginx/module/fair #指定fair文件夹
+nginx -V #复制所有的配置
+./configure --巴拉巴拉 --add-module=/root/nginx/module/fair
+make #报错很正常，网上找方案，去改nginx源码。
+cp ./objs/nginx /usr/local/nginx/sbin/nginx
+make upgrade
+
+server {
+	listen 8084;
+	server_name localhost;
+	location /video/ {
+		proxy_pass http://videobackend;
+	}
+	location /file/ {
+		rewrite ^(/file/.*) /server/$1 last;
+		proxy_pass http://filebackend;
+	}
+	location /server {
+		proxy_pass http://backend;
+	}
+}
+
+#四层，IP+Port。 LVS HAproxy
+#七层，URL。 Nginx HAproxy
+
+#/bin/sh
+#安装redis
+make PREFIX=/usr/local/redis/redis01 install
+redis.conf #daemonize 后台启动redis
+
+nginx分发redis1
+stream {
+	upstream redisbackend {
+		server 192.168.0.10:6380;
+		server 192.168.0.10:6381;
+	}
+	server {
+		listen 81;
+		proxy_pass redisbackend; #负载均衡
+		#注意，stream不认server_name
+	}
+	upstream tomcatbackend {
+		server 192.168.0.10:80;
+		server 192.168.0.10:81;
+	}
+	server {
+		listen 82;
+		proxy_pass tomcatbackend;
+	}
+}
+
+----------------------
+Nginx 做缓存服务器
+
+proxy_cache_path /usr/local/proxy_cache levels=2:1 keys_zone=wocao:200m inactive=ld max_size=20g;
+# 路径 /usr/local/proxy_cache
+# 文件层次，最多三层。这里两层。./2字母长度/1字母长度
+# 指定200mb的共享内存空间zone 
+# inactive一天
+# max_size最大20g
+
+proxy_cache
+proxy_cache_key #key的md5值
+proxy_cache_min_uses #
+
+upstream backend {
+	server 192.168.100.123:80;
+}
+server {
+	listen 8080;
+	server_name localhost;
+	location / {
+		proxy_pass http://backend/js/;
+	}
+}
+
+http{
+	proxy_cache_path /usr/local/proxy_cahce levels=2:1 keys_zone=aaaa:200m inactive=1d max_size=20g;
+	upstream backend {
+		server 192.168.100.123:8080;
+	}
+	server {
+		listen 8080;
+		server_name localhost;
+		location / {
+			proxy_cache aaaa;
+			proxy_cache_key bbbb;
+			proxy_cache_min_uses 5;
+			proxy_cache_valid 200 5d;
+			proxy_cache_valid 404 30s;
+			proxy_cache_valid any 1m;
+			add_header nginx-cache "$upstream_cache_status"; #添加缓存状态
+			proxy_pass http://backend/js/;
+		}
+	}
+}
+
+#删除缓存 
+#方法一文件全删了
+#还要过一次md5才能指定缓存文件
+rm -rf /usr/local/proxy_cache/*
+
+#第三方扩展模块
+ngx_cache_purge-2.3.tar.gz
+
+# 再次回顾安装扩展模块的步骤
+1，解压扩展模块
+2，nginx -V 取出当前参数
+3，configure --add-module=指定解压后的路径
+4，make;mv sbin/nginx sbin/nginxold;mv obj/nginx sbin/nginx
+5，make upgrade
+
+#client_return_http_head: nginx-cache: HIT # 命中，就是来自缓存
+log_format wocao $scheme$proxy_host$request_uri;
+access_log logs/access.log wocao;
+
+----------------------
+
+# nginx不缓存，常用做一些经常变动的数据
+proxy_no_cache $cookie_nocache $arg_nocache $arg_comment; #不缓存
+proxy_cache_bypass $cookie_nocache $arg_nocache $arg_comment; #依旧缓存，但是不从缓存里获取数据
+
+log_format params123 $cookie_nocache | $arg_nocache | $arg_comment; 
+# $cookie_nocache 这里是cookie当中nocache字段
+# $arg_nocache 这里是arg当中nocache字段
+# arg就是url?age_arg1=123&age_arg2=321;
+# $arg_commnet 这里是arg当中的comment字段
+# 而这个 | 不会被解析，只是纯粹的装饰
+upstream backend {
+	server 192.168.200.146:8080;
+}
+server {
+	listen 8081;
+	server_name localhost;
+	localtion / {
+		access_log logs/access_params.log params123;
+		root html;
+		index index.html;
+	}
+}
+
+#万能公式 if + 内嵌变量 +正则 + set + nginx指令  
+#不缓存实例  
+#正则匹配，设置变量，并且用变量管理状态nginx的指令(proxy_no_cache)
+if ($request_uri ~ /.*\.js$) {#匹配/xxx.js文件，匹配成功就设置变量为1
+	set $my_nocache 1;
+}
+#三个变量 满足一个不为0不为空 就no_cache
+proxy_no_cache $cookie_nocache $arg_nocache $arg_comment $my_nocache;
+proxy_cache_bypass $cookie_nocache $arg_nocache $arg_comment $my_nocache;
+
+----------------------
+
+#tomcat
+user -> nginx -> tomcat
+/demo/index.html 转发到 8080:/demo/getAddress
+#tomcat.apache.org nginx.org
+mkdir web_tomcat
+tar -zxf apache-tomcat*.tar.gz
+cd web_tomcat/;ll;mv ~/demo.war ./;cd apache*/bin/;startup.sh;curl 192.168.200.1:8080/demo/index.html
+
+#nginx反向代理转发到tomcat
+cp nginx.conf.default nginx.conf
+upstream webservice {
+	server 192.168.200.1:8080;
+}
+server {
+	listen 80;
+	server_name localhost;
+	#动
+	localtion /demo {
+		proxy_pass http://webservice;
+	}
+	#静
+	location ~ /.+\.(js|png|jpg|gif|css)	{
+		root html/web;
+	}
+	localtion / {
+		root html;
+		index index.html index.htm;
+		proxy_pass http://webservice;
+	}
+}
+#nginx -t;nginx -s reload;curl 192.168.200.1:80;
+意义:动静分离，tomcat集群。
+隐性知识:nginx 50000;tomcat 500;
+
+----------------------
+
+VRRP 高可用心脏 竞选主备、绑定 VIP、漂移 IP。
+keepalived:做vip，自动分配vip，会检测状态，做漂移ip
+lvs:四层，负载均衡性能比nginx高。可以和nginx二选一，也可以并存。并存时lvs会觉得nginx是一个普通后台服务。
+nginx:七层，负载均衡到五个tomcat。
+
+LVS&iptables共用Netfilter 底层的路由表和 conntrack（连接跟踪）模块
+LVS:调度员,ipvsadm
+iptables:门卫,允许/拒绝/修改. Netfilter 框架的 HOOK 点
+
+----------------------
+
+补充课程没说的keepalived当中LVS模块:
+LVS: Linux 2.4 以后 集成内核 
+安装 LVS，其实指的是安装它的管理工具 ipvsadm
+sudo yum install -y ipvsadm
+
+# IP 转发临时开启，立即生效
+echo 1 > /proc/sys/net/ipv4/ip_forward
+# 永久开启，写入配置文件
+echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.conf
+sysctl -p # 重新加载配置
+#内核模块是否加载
+lsmod | grep ip_vs
+#看 ipvsadm 是否可用
+ipvsadm -L -n
+LVS其实就在keepalived.conf里面配置执行后就是LVS的结果。
+而ipvsadm和keepalived的共同点是:都操纵同一个内核IPVS,ipvs是lvs的核心模块
+不同点:keepalived写配置文件->动态，ipvsadm手动命令->静态规则。
+keepalived/ipvsadm -> lvs -> ipvs
+
+----------------------
+
+keepalived_shell.sh
+#!/bin/bash
+num=`ps -C nginx --no-header | wc -l`
+if [ $num -eq 0 ];then
+	/usr/local/nginx/sbin/nginx
+	sleep 2
+	if[ `ps -C nginx --no-header | wc -l` -eq 0];then
+		killall keepalievd
+	fi
+fi
+#2>&1
+
+----------------------
+********************！！很重要！！*********************
+只做VRRP vip漂移的keepalived
+完整步骤:
+cp keepalived.conf keepalived.conf.default
+vim /etc/keepalived/keepalived.conf
+#global部分
+#切换后通知邮件:
+notification_email {} # 邮件接收方 多个
+notification_email_from # 邮件发送方 单个
+smtp_server xxx.com # 邮箱服务器
+smtp_connect_timeout 30 # 发送超时
+router_id Mortis01#随意取名，不重复就行，主要是报警和日志用来定位的
+vrrp_xxxx # 巴拉巴拉讲了一堆，不知道是干什么的，就用默认吧。
+vrrp_xxxx # 巴拉巴拉讲了一堆，不知道是干什么的，就用默认吧。
+vrrp_xxxx # 巴拉巴拉讲了一堆，不知道是干什么的，就用默认吧。
+vrrp_xxxx # 巴拉巴拉讲了一堆，不知道是干什么的，就用默认吧。
+#vrrp部分
+vrrp_instance VI_1 #VI_1是vrrp的名称
+state MASTER # MASTER 或者 BACKUP 必须大写
+interface eth0 # ens33 取决于你的网卡名
+virtual_router_id 51 #vrrp对应的实例id，保持默认即可
+priority 100 # 优先级，竞争用的，一般MASTER比BACKUP优先级高
+advert_int 1 # 发送vrrp的时间间隔，定时向外发送vrrp公告信息，告诉所有backup，我还活着。单位秒
+authentication { #认证相关
+	auth_type PASS #简单的密码认证，推荐
+	auth_pass 11111 #这里是密码，上限是8位
+}
+virtual_ipaddress { #虚拟ip地址 vip
+	192.168.200.240
+	#192.168.200.241
+	#192.168.200.242
+	#192.168.200.243
+}
+###另一台，就两行不一样，其他同上。
+state BACKUP
+priority 90
+----------------------
+#风骚律师 绝命毒师 荒野求生 bangdream bushi
+
+
 
