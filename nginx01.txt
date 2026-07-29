@@ -1063,5 +1063,120 @@ priority 90
 ----------------------
 #风骚律师 绝命毒师 荒野求生 bangdream bushi
 
+#四个自动索引做公共下载站
+location /download {
+	root /usr/local;
+	autoindex on;
+	autoindex_exact_size off;
+	autoindex_format html;
+	autoindex_localtime	on;
+}
+#添加用户认证
+yum install -y httpd-tools #安装生成密码的工具
+htpasswd -c /usr/local/nginx/conf/htpasswd Mortis01 #创建用户Mortis，会有交互让你输入密码
+htpasswd -b xxx Mortis02 123456#追加
+htpasswd -D xxx Mortis02 #删除Mortis02用户
+htpasswd -v xxx Mortis01 #验证密码是否正确
 
+ngx_http_auth_basic_module #默认安装着
+location /download {
+	root /usr/local;
+	autoindex on;
+	autoindex_exact_size off;
+	autoindex_format html;
+	autoindex_localtime	on;
+	auth_basic 'please input your auth';
+	auth_basic_user_file htpasswd;
+}
+
+#先不学Lua，把nginx用熟练了再说。
+===========================
+
+Lua扩展Nginx。  #谐音:鲁瓦 大小写敏感
+轻量，脚本语言，C编写，设计目的:为了嵌入其他应用 比如nginx,CheatEngine
+lua.org
+wget lua.org/xxx;tar -zxf *.tar;cd lua*/;make linux test#测试当前环境是否支持lua
+#!/usr/local/bin/lua
+print("hello world!")
+-- print("hahaha")
+--[[
+	print("hahaha")
+--]]
+print("A".."B") -- AB
+b=10 -- 默认是全局变量
+print(b) -- b
+local a = 100 -- 局部变量 手动local设置成局部变量
+print(a) -- nil
+local a = 100; print(a) -- 放在一行才能读取;分号是可选项
+-- nil boolean number string fuciton table thread userdate
+print(type(print))
+a = {} -- 创建a表
+print(type(a))
+arr = {"aaa","bbb","ccc"}
+arr[0] -- aaa
+arr[1] -- bbb
+arr[2] -- ccc
+arr["X"]=10
+arr["Y"]=100
+arr["Z"]=1000
+arr["X"] -- 10
+arr.X -- 10
+-- xxxxxxxx
+function add(...) -- 参数可变 ... 
+local a,b,c = ... -- 赋值给abc
+print(a,b,c)
+end
+add("x","y","z") -- x z y
+function add(a,b)
+return b,a
+end
+x,y = add(100,200) -- 调转
+-- thread 和 userdata 用的比较少
+-- 控制方式 if then elseif else
+--- 跳过这一块了。。
+local i=10 repeat print(i) i=i-1 until i < 1
+
+----------------------------
+
+#淘宝开发的ngx_lua
+LuaJiT
+OpenRestry 内部集成Lua和Nginx 
+而淘宝现在在用Tengine
+集成数量对比: nginx < Tengine < OpenRestry
+./configure
+make && make install
+
+location /getByGender {
+	default_type 'text/html';
+	set_by_lua $param "
+		-- 我草好麻烦啊。
+		-- 感觉自己还用不上这东西。
+		-- 不写了，感觉有点脱离计划 BV1ov41187bq 第154课 
+	"
+
+}
+location /lua {
+	defautl_type 'text/html';
+	content_by_lua 'ngx.say("<h1>hahaha</h1>")';
+}
+
+----------------------------
+
+# 用 lua 将NGINX和redis做搭配
+# 内容省略，用的时候再查。
+# 先有这个基本概念和认识。
+# 大概就是连接,读写,超时,关闭.
+
+# nginx+lua 除了redis，还可以操作mysql
+# 过程省略了。暂时用不到。
+
+# json 轻量级的数据交换格式 数据序列化方式 
+# cjson 啥玩意..问ai都得愣一会。
+# 把cjson和redis和mysql放在一起，我还以为多重要呢。。
+# Commented JSON"带注释的JSON ; Compressed JSON压缩的JSON
+# cJson 不是 cjson 大小写敏感 
+# 这里的cjson是lua-cjson 这里的c是因为c语言开发的
+# 只是库名
+
+----------------------------
 

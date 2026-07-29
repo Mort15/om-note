@@ -1,0 +1,44 @@
+nginx02.txt
+--------------------------
+nginx静态文件下载站点:
+autoindex on; #启动下载站
+alias #永远绝对路径
+location #在root的基础上，子地址
+root #指定文件地址，父地址
+charset utf-8,gbk; #万国码和国标，解决中文乱码
+autoindex_localtime on; #使用本地时间
+autoindex_exact_size off; #文件大小
+--------------------------
+控制权限-通过账号密码:
+httpd-tools
+htpasswd -b c /etc/nginx/auth_pass haha hehe
+auth_basic "haha";
+auth_basic_user_file /etc/nginx/auth_pass;
+--------------------------
+控制权限-通过IP:
+#从上往下匹配，不能一开始就allow/deny all;
+allow 10.0.0.1;
+deny all;
+--------------------------
+location /download {
+	charset utf-8,gbk;
+	alias /package;
+	autoindex on;
+	autoindex_localtime on;
+	autoindex_exact_size off;
+	auth_basic "test";
+	auth_basic_user_file auth_pass;
+	allow 10.0.0.1;
+	deny all;
+}
+--------------------------
+#监控stub_status;
+location /nginx_status {
+	stub_status;
+}
+Active connections: 15 #Active_connections = Reading + Writing + Waiting 主要受 keepalive_timeout 的影响。
+server accepts handled requests # 累积的"里程表"
+ 15398 15398 43738 
+Reading: 0 Writing: 1 Waiting: 14 #读很快 正常是0;写，主要是文件传输;Waiting的数量最多，是Active的主要构成，是因为keepalive_timeout让TCP连接延长了，把挥手时间拉长了。
+
+
