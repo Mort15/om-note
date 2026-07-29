@@ -40,5 +40,50 @@ Active connections: 15 #Active_connections = Reading + Writing + Waiting 主要�
 server accepts handled requests # 累积的"里程表"
  15398 15398 43738 
 Reading: 0 Writing: 1 Waiting: 14 #读很快 正常是0;写，主要是文件传输;Waiting的数量最多，是Active的主要构成，是因为keepalive_timeout让TCP连接延长了，把挥手时间拉长了。
+--------------------------
+limit_conn_zone $remote_addr zone=conn_zone:10M; #定义conn_zone 并且限制10兆
+limit_req_zone $binary_remote_addr zone=req_zone:10m rate=500r/s; #定义req_zone 并限制每秒500个请求 burst延迟处理是延迟加载的资源， rate必须高于资源数
+server{
+	limit_conn conn_zone 10; #同IP最多同时10个TCP连接
+	limit_req zone=req_zone burst=30 nodelay;
+}
+ab -n 20000 -c 20 http://127.0.0.1/index.html
+--------------------------
+server {
+	listen 80;
+	server_name module.oldboy.com;
+	charset utf-8,gbk;
 
+	location / {
+		root /code;
+		index index.html index.htm;
+		limit_req zone=req_zone burst=3 nodelay; #设置延迟加载项3个
+		limit_req_status 478; #修改状态码为478
+		error_page 478 /code/error.html; #状态码匹配 错误页
+	}
+}
+
+#limit_conn_zone 同时连接数，因为有NAT和大型局域网的存在，这个把握不准。
+#limit_req_zone 请求速率，这个就把握准了。
+#$binary_remote_addr 省内存、效率高，是$remote_addr的“压缩包”。
+--------------------------
+1,多个HTTP请求可以建立在一个TCP连接上。->所以控制HTTP请求而不是TCP请求。
+2,不限制 如:css js gif png jpg
+3,限制 如:html php
+4,location匹配: #匹配之间有优先级
+location = / {} # =	精确匹配
+location /doc/ {} #/doc/
+location ^~ /images/ {} #^~	以/images/开头
+location ~ \.(gif|jpg|jpeg|png)$ {} #~	区分大小写
+location ~* \.(gif|jpg|jpeg|png)$ {} #~*	不区分大小写
+location / {} #/	匹配所有
+--------------------------
+# 官网找不到的关键词就去core核心模块去找
+# 面试题: location的匹配规则,以优先级。
+1,等号精确匹配 	=
+2,以开头 		^~
+3,区分大小写匹配 	~ #这两个其实是同级关系
+4,不区分大小写	~* #这两个其实是同级关系
+5,默认匹配		/
+--------------------------
 
