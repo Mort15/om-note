@@ -1,0 +1,80 @@
+nginx03.txt
+php-fpm
+#绿液惊魂
+快速NGINX匹配回顾优先级
+=	精确匹配
+^~  头匹配
+~	模糊匹配，区分大小写
+~*	和~同级，看先后顺序。模糊匹配，不区分大小写
+/	全局匹配，默认匹配，不做判断。
+
+#问题1 谬误理解是否正确：
+谬误之谬误：A说了10个观点，有一个论点不对，就总结10个论点都不对。
+稻草人谬误：曲解对方的观点，去攻击并非本意的观点。
+滑坡谬误：认为A的1观点不对就很牵强的联系到2观点，牵强的3观点，忽略"概率忽略量变质变"等复杂因素直接达到下个阶段。常用“必然”来替换“可能”。
+诉述情感：放大或者缩小效果，甚至恐吓等等情感类的东西。比如一边玩电子游戏一边听音乐会引发大爆炸等。
+诉述权威：引用毫不相关的权威或者名人名言随意说的话，认为这些话都是不可撼动的真理来作为论点。
+人身攻击：不关注问题本身，而是去攻击 社会地位 身高 等等。
+虚假两难：忽略量的二极管。
+
+#问题2 效应理解是否正确：
+滑坡效应 现实社会现象，如纵使自己，让小恶渐变培养为大恶。
+破窗效应 不良现象如果被放任，会诱使人们仿效，甚至变本加厉。它更侧重于环境对行为的诱发。墙上涂鸦和犯罪率的关系。地上环境卫生，只要有一个垃圾，就会有无数个垃圾。
+登门槛效应 “爱喝热水”，记者先要求喝的热水，后面逐渐加力度。“为了维护爱喝热水人设而自愿顺从”。
+--------------------------
+#LNMP 架构
+php-fpm 属于APACHE的服务
+yum install yum-plugin-downloadonly
+ #只下载不安装
+yum -y localinstall *.rpm #自动解决相互依赖问题
+rpm -qa #查已经安装的包
+yum list #看所有的包
+yum -y install mariadb-server #maria是甲骨文收购后的改名
+#火腿肠 鸡骨泥
+fastcgi 代理配置语法
+#可以用普通的IP+端口的形式
+fastcgi_pass localhost:9000;
+#可以以接口的形式来运行
+fastcgi_pass unix:/tmp/fastcgi.socket;
+fastcgi_index index.php; #默认返回index.php而不是index.html。
+fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name; #定义变量，NGINX通过php内置变量才能拿到用户的请求。
+#就像RSYNC_PASSWD一样，PHP也是读取内部变量。
+--------------------------
+server {
+	listen 80;
+	server_name _;
+
+	location / {
+		root /code;
+		index index.html index.php;
+	}
+}
+location ~* \.php$ {
+	root /code;
+	fastcgi_pass 127.0.0.1:9000;
+	fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name
+	include fastcgi_params;
+}
+--------------------------
+2026年7月30日15:40:23提炼:
+主要新的内容:
+1，匹配.php   \.转义特殊字符  php$后缀php结尾匹配 
+2，~* 不区分php大小写的匹配
+3，fastcgi_pass 127.0.0.1:9000; # fastcgi_pass proxy_pass 用法很像，并且都是pass结尾。
+4，fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+主要就是记忆和理解最后一行:
+SCRIPT_FILENAME 可以在phpinfo()里面看到，$document_root文档根目录,$fastcgi_script_name请求的脚本文件名.最后拼接在一起赋值给SCRIPTE_FILENAME
+两类参数的来源是:SCRIPT_FILENAME 是php内置变量，可以在phpinfo看到
+而$document_root和$fastcgi_script_name是nginx的扩展包的内置变量。
+我草！我理解的这么准确吗？！！
+推测过程:用NGINX常规变量的写法推断$开头的是内置变量;fastcgi是nginx可有可无的，所以是nginx扩展包;phpinfo包含的变量所以大写的SCRIPT_FILENAME是php内置变量。
+include fastcgi_params; #定义了大量 CGI 标准变量，在conf文件能找到，其中包含$document_root和$fastcgi_script_name
+--------------------------
+location ~ \.php$ {
+	root /usr/share/nginx/html;
+	fastcgi_pass 127.0.0.1:9000;
+	fastcgi_index index.php;
+	fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+	include fastcgi_params;
+}
+--------------------------
