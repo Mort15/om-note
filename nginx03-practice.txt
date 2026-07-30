@@ -1,0 +1,159 @@
+nginx阶段练习-2026年7月30日.txt
+来自nginx.org官网，主要用来理清关系和英文扫盲。
+会直接影响未来的判断和学习效率，属于经验性的知识。
+strict 严格
+interval 间隔
+instance 实例
+valid 有效
+vendor 小贩
+protocol 协议
+cache 缓存
+buffer 缓冲
+bypass 绕过
+convert 转换
+offset 抵消
+load average 平均负载
+json 序列化
+cjson nginx的扩展
+jsonp 解决跨域问题
+argument 争论
+kilobytes, megabytes, gigabytes : kb mb gb 
+tries try的过去式
+Directives 指导性的指令
+epoll 多路复用技术
+gi结尾一般都是通信协议 wsgi fast-cgi
+hc : health check
+mqtt 消息 队列 传输 ，物联网常用
+realip real ip 真正的ip 应该是解决内网负载均衡转发时ip被更改的问题
+split 分割;filter 过滤;preread 预读
+reference 参考
+Introduction 介绍
+
+chown -R apache.apache /code/wordpress/
+#但是有时候不一定是apache，有时候得用nginx的权限。
+#有个小技巧可以解决这个问题:nginx和php-fpm都统一服务的启动用户www
+groupadd -g666 www
+useradd -u666 -g666 -M -s /sbin/nologin www
+nginx.conf: user www;
+/etc/php-fpm.d/www.conf: user = www      group = www
+#egrep '^user|^group' www.conf
+
+#01
+location ~* \.php$ {
+	fastcgi_pass 127.0.0.1:9000;
+	fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+	include fast_params;
+}
+
+#02
+location ~* \.php$ {
+	fastcgi_pass 127.0.0.1:9000;
+	fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+	include fastcgi_params;
+}
+
+#03
+server {
+	listen 80;
+	server_name _;
+
+	location ~* \.php$ {
+		root /www/nginx/html;
+		index index.html index.php;
+		include fastcgi_params;
+		fastcgi_pass 127.0.0.1:9000;
+		fastcgi_index index.php;
+		fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+	}
+
+	location ~* \.(jpg|png|gif|html|css|js|zip|tar.gz|doc|xlsx|exe|7z|mp3|mp4|wav|m4a|xml|) {
+		autoindex on;
+		autoindex_localtime on;
+		autoindex_exact_size off;
+		alias /tmp/;
+		gzip on;
+		gizp_comp_live 5;
+		expires 10800;  #echo|awk '{print 3600*3}' #10800
+	}
+
+	upstream tomcat_backup {
+		server 192.168.0.1;
+		server 192.168.0.2;
+		server 192.168.0.3;
+		server 192.168.0.4;
+		server 192.168.0.5;
+	}
+
+	location ^~ tomcat {
+		proxy_pass tomcat_backup;
+
+	}
+}
+
+#04
+server {
+	listen 80;
+	server_name _;
+	root /tmp/www/html;
+	index index.php index.html;
+
+	location  ~* \.php$ {
+		fastcgi_pass 127.0.0.1:9000;
+		fastcgi_index index.php;
+		fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+		inlucde fastcgi_params;
+	}
+}
+
+#05
+突然发现漏掉的day32的课。。。
+scgi_params
+uwsgi_params
+#其他在外面的都是核心区块
+events {}
+http {}
+user nginx; #启动nginx的虚拟用户
+worker_processes auto; #启动的子进程数量 auto以内核数量为准
+#lscpu,top,ps aux|grep nginx
+error_log /var/log/nginx/error.log notice; #错误日志所在位置 notice是默认日志级别 最顶配是debug级别
+pid /var/run/nginx.pid; #存放nginx的pid号
+#kill -9 `cat /var/run/nginx.pid` 
+worker_connections 65536; #进程最大连接数
+include /etc/nginx/mime.types; #媒体类型
+default_type application/octet-stream; #如果媒体类型找不到，就变成下载。
+log_format main # 定义一个名字叫mian的日志格式，后面的很多参数都可以拿来用。
+access_log /var/log/nginx/access.log main; # 
+#---------- 优化参数 -----------
+sendfile on; #开启高效文件传输模式 零拷贝，跳过用户缓冲区 
+tcp_nopush on; #优化网络包发送 合并数据包 
+keepalive_timeout 65; #管理长连接超时 
+gzip on; #开启响应内容压缩，默认只压缩text/html。gzip_types可以额外制定压缩的类型。
+include /etc/nginx/conf.d/*.conf; #在conf.d写的东西都会包裹在这里。优先级问题以及匹配生效顺序都要清楚。
+755 644
+#之前一直以为mysql要放到数据库运维时才讲，原来中级阶段的“实战课”就已经把mysq主从都讲完了
+#要是这么说的话，中级阶段除了Jenkins没学之外，几乎全讲了。甚至基础的shell脚本写法都讲了。
+#还有这些“述职报告”部分真尼玛牛逼。。。而且感觉很多人比如陈思源是有基础的，甚至感觉是干过一两年的。
+
+#06
+
+server {
+	root /var/www/html;
+	use epoll;
+	user www;
+	listen 9000;
+	server_name _;
+
+	location / {
+		alias /var/www/html/file_download; #放一些静态文件
+		autoindex on;
+	}
+
+	location ~* \.php$ {
+		fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+		fastcgi_index index.php;
+		include /etc/nginx/fastcgi_parames;
+	}
+}
+
+
+#小技巧:sublime里敲alt+v+s*3+回车*2 可以快速切换成bash风格

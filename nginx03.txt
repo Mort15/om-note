@@ -78,3 +78,19 @@ location ~ \.php$ {
 	include fastcgi_params;
 }
 --------------------------
+记几个域名
+cn.wordpress.org
+php.net
+mariaDB.org
+nginx.org
+
+nginx和fpm同步权限
+chown -R apache.apache /code/wordpress/
+#但是有时候不一定是apache，有时候得用nginx的权限。
+#有个小技巧可以解决这个问题:nginx和php-fpm都统一服务的启动用户www
+groupadd -g666 www
+useradd -u666 -g666 -M -s /sbin/nologin www
+nginx.conf: user www;
+/etc/php-fpm.d/www.conf: user = www      group = www
+#egrep '^user|^group' www.conf
+
