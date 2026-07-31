@@ -1,0 +1,1149 @@
+2026年7月1日 
+
+1，发现b站在吞我评论区留的笔记。
+
+2，web端b站评论会强制换行破坏排版。
+
+awk速通，快速收集awk的知识。
+
+
+
+day13 补
+
+sed
+
+a 追加到后面
+
+i 插到前面
+
+d 删除
+
+p 打印
+
+s 替换
+
+c 取代
+
+-n 仅显示脚本处理后的结果
+
+
+
+day14 awk [主要是ai出题做题]
+
+隐性知识:
+
+awk 默认是带{print}的
+
+awk '模式{print} file == awk '模式' file
+
+是三剑客 awk sed grep 的老大。
+
+
+
+awk '动作' 文件名
+
+awk '{print $0}' file #打印整行
+
+awk '{print $1}' file #打印第一行
+
+awk -F ':' '{print $1}' file #-F 指定分隔符
+
+
+
+内置变量:
+
+NF字段数  Number of Fields
+
+NR记录数  Number of Records
+
+FS输入字段分隔符  Field Separator
+
+OFS输出字段分隔符 Output Field Separator
+
+FILENAME文件名  File Name
+
+主要记住这几个单词缩写:
+
+F-Fields-字段
+
+R-Records-记录
+
+O-output-输出
+
+
+
+函数:
+
+toupper()：将字符串转为大写。
+
+tolower()：将字符串转为小写。
+
+length()：返回字符串长度。
+
+substr()：提取子字符串。
+
+
+
+awk -参数 '模式 {}' 文件
+
+awk -F ':' '/usr/ {print $1}' file
+
+awk -F ':' 'NR % 2 == 1 {print $1}' file
+
+awk -F ':' '{if ($1 > "m") print $1; else print "---"}' file
+
+
+
+#awk练习题
+
+
+
+awk 'NR>1 {sum += $3; count++} END {printf "%.2f\n", sum/count}' emp.txt
+
+awk 'NR>1 {dept[$2]++} END {for (d in dept) print d, dept[d]}' emp.txt
+
+awk 'NR>1 {sum[$2] += $3} END {for (d in sum) print d, sum[d]}' emp.txt
+
+初始化用begin，统计输出结果用END。
+
+
+
+2026年7月3日 
+
+
+
+按下开机键
+
+[ BIOS + MBR ] / [ UEFI + GPT ]
+
+
+
+GRUB 常常在系统识别错误时会冒出来。
+
+kernel 装载驱动，挂载rootfs，执行/sbin/init
+
+
+
+[ kernel + init + runlevel ]
+
+init 0 关机
+
+init 1 单用户 常用于找回密码
+
+init 2 多用户 是init 3的阉割版
+
+init 3 命令行，默认状态
+
+init 4 待开发
+
+init 5 Desktop GUI模式
+
+init 6 重启
+
+
+
+
+
+awk临时计算：
+
+[root@exercise log]# echo|awk '{print 80+40}'
+
+120
+
+[root@exercise log]# echo 80 90 | awk '{print $1+$2}'
+
+170
+
+
+
+Linux 系统启动过程：
+
+1，BIOS/UEFI 开机自检，新系统win11用uefi，传统用bios
+
+
+
+2，
+
+现代：
+
+UEFI：固件程序
+
+GPT： 分区表
+
+ESP： FAT32 格式分区
+
+EFI：可执行文件，启动钥匙，/EFI/GRUB/grubx64.efi
+
+GRUB：启动菜单界面
+
+传统：
+
+BIOS：固件程序MBR：既是分区表也是扇区GRUB：启动菜单界面
+
+3，内核初始化 kernel 内核解压，检测硬件，加载驱动挂载真正的根目录
+
+4，运行等级 runlevel 0停机 ;1单用户 无ssh ;2多用户无NFS ;3完整 ;4无 ;5 x11 GUI ;6重启
+
+minigetty：mini get a tty
+
+引导/启动阶段/boot/grub/grub.cfg或/boot/grub/menu.lst/etc/fstab/etc/hostname/etc/hosts/etc/resolv.conf/etc/sysctl.conf/etc/inittab（SysV 传统）/etc/init.d/*（SysV 脚本目录）/etc/rc.d/rc.local（某些发行版）/etc/systemd/system/default.target（systemd）/lib/systemd/system/*（systemd 服务单元）/etc/systemd/system/*（自定义 systemd 服务单元）/etc/modules-load.d/*.conf（内核模块加载）/etc/security/limits.conf
+
+用户登录/SHELL 环境阶段/etc/profile/etc/profile.d/*.sh/etc/bashrc或/etc/bash.bashrc/etc/environment（systemd 用户环境）/etc/skel/.bashrc（新用户模板）~/.bash_profile~/.pr0file~/.bashrc~/.bash_logout~/.bash_history（退出时写入）/etc/passwd（验证登录时读）/etc/shadow（验证密码时读）/etc/group/etc/sudoers
+
+
+
+创建删除用户和组：-M 没有家目录1，groupadd -g888 test012，useradd -u888 -g888 -M -s /sbin/nologin test01userdel -r test01passwd test01echo hahaha|passwd -stdin test01chown test01.test01 filechown -R test01.test01 file/etc/skel
+
+傀儡用户/虚拟用户：-M 没有家 ； -s /sbin/nologin 不能登录的shell
+
+生成复杂密码：存密码的命令：keepass生成密码的其中一条命令：openssl rand -base64 14
+
+给别人授权：visudo 第100行 可以编辑某个用户可以使用的命令权限，三选一oldboy ALL=(ALL) /usr/bin/su # 一般oldboy ALL=(ALL) ALL # 最简单old boy ALL=(ALL) NOPASSWD: ALL # 最危险old boy ALL=(ALL) ALL,!/usr/bin/rm #取反，部分不能用切换用户：sudo su -sudo su - rootsudo su - oldboy1，输入自己密码是有时效性的2，sudo -k 可以手动清理密码3，sudo -l 可以查看当前权限状态
+
+2026年7月3日单词：syntax 语法invalid 无效unexpected 非预期 # awk: cmd. line:1: ^ unexpected newline or end of stringrepository 仓库 # /etc/yum.repos.d/Centos-7.reposkeleton 头骨 # /etc/skel/用来生成用户目录的隐藏文件/变量，例如PS1变量
+
+查看登录记录：last [每次的，日志类型的] 和 lastlog [最新的，表格类型的]查看公网IP：curl cip.cc
+
+时间调整：dateclockhwclock -wtimedatectl set-timezone Asia/Shanghai
+
+密码结构：/etc/shadow$id$salt$encrypted
+
+sed练习题：9. 删除20到30行最后一个单词（字符）[root@exercise ~]# sed '2,4s/.$//g' test.txt [root@exercise ~]# sed -re '2,4s/(^.)(.*)(.$)/\1\2/g' test.txt
+
+10.将3到110行第一个字符与最后一字符对调[root@exercise ~]# sed -r '3,110s/(^.)(.*)(.$)/\1\1\1/g' test.txt
+
+13.解除文件注释，并删除4-6行#加-e 的话，每个 ''组 都加 -e。
+
+[root@exercise ~]# sed -re 's/#//g' -e '4,6d' test.txt
+
+14.删除1-3行并用root替换sbin[root@exercise ~]# sed -re '1,3d' -e 's/root/sbin/g' test.txt
+
+15.删除1-8行并打印1-20行[root@exercise ~]# sed -e '1,8d' -e '1,20p' test.txt
+
+16. 把所有var全部替换成root，并将第一个字符和最后一个字符对调#加-r的话，只需要加一个-r。[root@exercise ~]# sed -re 's/var/root/g' -e 's/(^.)(.*)(.$)/\3\2\1/g' test.txt
+
+17. 删除所有包含var的行[root@exercise ~]# sed '/var/d' test.txt
+
+18. 把2行以后的末尾加上awr[root@exercise ~]# sed -r '2,999s/(.$)/(.$)awr/g' test.txt
+
+19. 打印第1到5行，删除8行后面所有的行[root@exercise ~]# sed -ne '1,5p' -e '8,999d' test.txt
+
+awk：
+
+打印所有用户的用户名和 UID（第1和第3字段）。[root@exercise ~]# awk -F ":" '{print $1,$3}' passwd
+
+打印 UID 大于 1000 的用户名和家目录。[root@exercise ~]# awk -F ":" '{if ($3>=1000){username=$1}}{print username}' passwd 最优解：命令：awk -F: '$3 > 1000 {print $1, $6}' passwd.txt
+
+打印登录 shell 为 /sbin/nologin 的用户名。# 从上一道题学会的，花括号外加匹配条件。[root@exercise ~]# awk -F ":" '$7 == "/sbin/nologin" {print $1}' passwd
+
+统计共有多少个用户。[root@exercise ~]# awk -F ":" '{count++}END{print count}' passwd 标准：命令：awk -F: 'END {print NR}' passwd.txt# 这里他跳过了全部，END只在最后执行一次，取这时候的NR。优化这一块。
+
+统计使用 /bin/bash 作为 shell 的用户数量。[root@exercise ~]# awk -F ":" '{ if( $7 == "/bin/bash" ) sum++; } END { print sum }' passwd # 几乎和标准答案一模一样
+
+计算所有用户的平均 UID（保留两位小数）。[root@exercise ~]# awk -F ":" '{count++;sum+=$3;}END{printf "%.2f\n",sum/count}' passwd 最优解：awk -F: '$7 == "/bin/bash" {count++} END {print count}' passwd.txt两个缺陷： 1，%.2f没加双引号。 "%.2f" 2，print忘记加f。 printf
+
+打印第 5 行到第 10 行的用户名和 UID。[root@exercise ~]# awk -F: '5,10{print $1,$3}' passwd 最优解：awk -F: 'NR>=5 && NR<=10 {print $1, $3}' passwd.txt# 迭代：-F ":" 缩写成 -F:
+
+打印用户名、UID 和 GID，格式为“用户名(UID:GID)”。[root@exercise ~]# awk -F: '{print $1"("$3":"$4")"}' passwd 最优解：awk -F: '{printf "%s(%d:%d)\n", $1, $3, $4}' passwd.txt#迭代点：变量之间要么加,要么加"内容"。
+
+查找描述字段（第5字段）中包含空格的用户名。[root@exercise ~]# awk -F: '{ if ($5 ~ / /) result=$1 ; } { print result }' passwd 最优解：awk -F: '$5 ~ / / {print $1}' passwd.txt# 这道题做起来有点困难，迭代：1，字段匹配正则表达式的方式。$5 ~ / / 在/之间。2，用if前要先看看能不能直接在花括号外匹配。3，;分隔符，-F:不要忘。4，==是对比的相等，=是赋值。
+
+打印所有 UID 为奇数的用户名。[root@exercise ~]# awk -F: '{if ($5%2); print $1}' passwd # 秒了
+
+显示所有用户的 shell，并去重统计每种 shell 的出现次数。这个不会。命令：awk -F: '{shells[$7]++} END {for (s in shells) print s, shells[s]}' passwd
+
+打印家目录（第6字段）以 /var 开头的用户名和家目录。[root@exercise ~]# awk -F: '$6 ~ /^\/var/{print $1,$6}' passwd # 迭代：/这里如果有特殊字符的话需要用反斜杠/
+
+输出用户名和 UID，但 UID 小于 10 的标记为 “admin”，否则标记为 “user”。[root@exercise ~]# awk -F: '{if($3<10) print "admin:"$1; else print "user:"$1}' passwd # 瞎蒙的语法居然一次成功。最优解：awk -F: '{print $1, ($3<10 ? "admin" : "user")}' passwd.txt迭代：awk支持三元运算。加上双引号会自动追加。
+
+将每行的 UID 和 GID 互换后输出整行（冒号分隔）。#完了，已经忘记sed怎么写了，怎么自定义分隔符来着。[root@exercise ~]# sed -r 's/(^.*)x:([0-9]*):([0-9]*)(.*$)/\1x:\3:\2:\4/g' passwd [root@exercise ~]# awk -F: '{t=$3;$3=$4;$4=t;print $1":"$2":"$3":"$4":"$5":"$6":"$7}' passwd 最优解：awk -F: -v OFS=':' '{t=$3; $3=$4; $4=t; print}' passwd.txt#迭代：-v OFS=':' 可以替换"默认填充段"
+
+
+
+打印最后一行的用户名和 shell。[root@exercise ~]# awk -F: 'END{print $1,$7}' passwd
+
+输出行号、用户名和 UID，行号从 0 开始。[root@exercise ~]# awk -F: -v OFS=':' '{print NR,$1,$3}' passwd 最优解：awk -F: '{print NR-1, $1, $3}' passwd.txt迭代：1，NR这种变量是可以-1计算的。2，再练习一遍 -v OFS=':'
+
+打印 UID 最大的用户的用户名和 UID。[root@exercise ~]# awk -F: -v OFS=':' '{if ($3>maxnum)maxnum=$3;}END{print $1,maxnum}' passwd
+
+将文件中所有冒号替换为制表符，并输出前 5 行。[root@exercise ~]# sed 's/:/\t/g' passwd | head -n 5 [root@exercise ~]# awk -F: -v OFS="\t" '{if (NR<5) print $1,$2,$3,$4,$5,$6,$7}' passwd 最优解：awk -F: -v OFS='\t' 'NR<=5 {print}' passwd.txt
+
+迭代：1，-v OFS="\t"这玩意居然还能换成\t。2，简写$1,$2,$3,$4,$5,$6,$7。默认{print}就是打印全部。3，不用if，老毛病又犯了，能直接过滤就不用写if。4，1,5这是哪里的写法？为什么这里不能用。sed-n '1,5p' passwd。。又搞混了。sed用 1,5。awk用NR。
+
+删除描述字段（第5字段）为空的行，并打印剩余行的用户名和描述。[root@exercise ~]# awk -F: -v OFS=":" '$5 != "" {print $1,$5}' passwd
+
+分别统计 UID 为 0、1~100、101~1000、>1000 的用户数量。[root@exercise ~]# awk -F: -v OFS=":" '{if($3==0)a++;if($3>=1 && $3<=100)b++;if($3<=1009 && $3>=101)c++;if($3>1000)d++;}END{print a,b,c,d}' passwd
+
+
+
+
+
+ugo chmod ugo-x file
+
+number chmod 644 file
+
+r 4 ; w 2 ; x 1
+
+默认权限：
+
+umask
+
+隐藏权限位：
+
+a i
+
+laattr
+
+chattr +/- i file
+
+特殊权限位：
+
+s t
+
+[root@exercise ~]# echo oldboy{01..3}|xargs -n1|sed -r 's/(.*)/useradd \1;echo `mkpasswd`|passwd --stdin \1/g' | bash
+
+
+
+
+
+----------------开启网络前的全部知识点整理----------------
+
+
+
+
+
+ 名词记不住的地方：
+
+--stdin 
+
+
+
+NFS/AFS iSCSI PXE/RPL 映射/流式 外存载入内存执行
+
+oom问题：swap 解决
+
+dd if=/dev/zero of=/var/log/1.log bs=1M count=10000
+
+进程不干活，fork一个孩子，让孩子干活exec。
+
+load average：繁忙程度，达到cpu核心数时，很繁忙了。
+
+fdisk parted gdisk mbr gpt
+
+
+
+prod生产 ； dev开发 ；syntax 语法 ； invalid 无效
+
+unexpected 非预期 # awk: cmd. line:1: ^ unexpected newline or end of string
+
+repository 仓库 # /etc/yum.repos.d/Centos-7.repo
+
+skeleton 头骨 # /etc/skel/用来生成用户目录的隐藏文件/变量，例如PS1变量
+
+
+
+查看登录记录：last [每次的，日志类型的] 和 lastlog [最新的，表格类型的]
+
+查看公网IP：curl cip.cc
+
+四个文件自启对比：fstab内核层/profile变量层/rc.local服务层/bashrc用户层
+
+/var/spool/cron/{UserName}
+
+
+
+tar -t看内部 -f指定文件 -v详细信息 -c创建 -x解压 -z tar.gz格式
+
+
+
+列变成行：
+
+tr '\n' ' '
+
+sed -z 's/\n//g'
+
+
+
+把后台调用到前台：
+
+fg %100
+
+
+
+踢出：
+
+pkill -9 -t pts/0
+
+
+
+stat文件详细信息
+
+
+
+笔试题：
+
+r4 w2 x1 ; file666-022 = 644 ; dir777-022 = 755
+
+如果file umask有奇数位，文件需要相减后加1。
+
+File 666
+
+umake	032 #这里3是奇数位
+
+= 634
+
++ 010 # 结果给加1
+
+= 644
+
+
+
+面试题：
+
+Linux 启动顺序：
+
+
+
+Day01~Day03：Vmware Linux 安装
+
+unix收费 – 大学老师做免费版本 – 一伙人写了一堆逆天工具，没写内核 – 脱袜丝合并内核和工具
+
+企业常用Linux发行版，Redhat 系列：Centos 7.9[和redhat一模一样] ；Debian系列： Ubuntu[桌面牛逼，开发喜欢用]。
+
+Fedora是centos的小白鼠版本。
+
+Debian和FreeBSD很安全。
+
+SUSE数据库很牛逼，德国用的人很多。
+
+Kernel版本号 2.7 ；3.10
+
+
+
+standard partition 标准分区讲究：
+
+	/boot 200mb 内核
+
+	swap 2048
+
+	/ 剩余全部
+
+改网卡名：biosdevname=0 net.ifnames=0 ifnames=0
+
+不要kdump
+
+network 和 NetWorkMangager 二选一
+
+改网络配置：/etc/sysconfig/network-scripts/ifcfg-eth0
+
+
+
+ctrl + a ctrl + e
+
+ctrl + u ctrl + y
+
+ctrl + s ctrl + q
+
+
+
+vmware兼容问题，16.2.2
+
+
+
+
+
+
+
+Day4~：
+
+硬件来源：/dev/sr0 和 /dev/cdrom
+
+磁盘和文件大小：df -h ; du -h
+
+文件含义：boot内核+引导 ; proc映射
+
+alias意识：\mv 这样可以绕过alias用原汁原味的原始的mv命令。
+
+单行for：for day in {1..5}; do echo “$day”; done
+
+Linux隐性知识：esc+. 上一行最后一个参数到当前
+
+序列：echo {/dev/}
+
+
+
+xargs -I {}
+
+nslookup 在 bin-utils
+
+charset utf-8 或 gbk
+
+
+
+#DEFROUTE=yes#将此网络接口设置为系统的默认网关
+
+BOOTPROTO=none #关闭DHCP
+
+
+
+/etc/sysconfig/network-scripts/ifcfg-eth0一共只要这几条就足够：
+
+TYPE=Ethernet
+
+BOOTPROTO=none
+
+DEFROUTE=yes
+
+NAME=eth0
+
+DEVICE=eth0
+
+ONBOOT=yes
+
+IPADDR=192.168.0.236
+
+PREFIX=24
+
+GATEWAY=192.168.0.1
+
+DNS1=114.114.114.114
+
+
+
+/etc/fstab：
+
+/dev/mapper/centos-root / xfs defaults 0 0
+
+1，(从哪来)设备路径,设备UUID： /dev/mapper/centos-root
+
+2，(到哪去)挂载点： / 
+
+3，(怎么存)文件系统类型：xfs
+
+4，(小调整)给什么权力：defaults
+
+5，不备份写0，不自检写0
+
+
+
+/etc/motd：
+
+欢迎界面。
+
+
+
+/etc/issue*:
+
+内核信息，删掉更安全。
+
+
+
+/etc/shadow:
+
+$id$salt$encrypted
+
+
+
+
+
+Load average：
+
+1分钟 5分钟 15分钟
+
+超过核心数就是十分繁忙。
+
+
+
+ctrl+v 块模式，相当于sublime鼠标中键
+
+shift+v批量处理行，相当于sublime中键后ctrl+l
+
+
+
+时间调整：
+
+time
+
+timedatectl
+
+date -s 20260606 # lock time 😋
+
+hwclock -w
+
+date +%F-%H-%M-%S # 日志常用
+
+ntp
+
+
+
+yum：
+
+tab自动补全包：bash-completion
+
+ntp手动同步包：ntpdate
+
+epel yum扩展包：epel-release
+
+xshell上传文件包：lrzsz
+
+
+
+vim行号显示：
+
+echo “set nu” >> ~/.vimrc
+
+
+
+vim替换/sed替换：
+
+sed s/old-string/new-string/g filename
+
+sed s#old-string#new-string#g filename
+
+sed s|old-string|new-string|g filename
+
+
+
+
+
+
+
+
+
+三剑客启动扩展正则：
+
+老三grep -E “string” file
+
+老二sed -rn “/string/p” file
+
+老大哥awk 默认启动扩展 ‘/string/{print $0}’ file
+
+
+
+&>/dev/null 解决了什么实际问题？
+
+1，和maild是否启动有关系：
+
+	堆积大量未发送细碎文件/var/spool/postfix。
+
+2，和inode有关系：
+
+	Linux系统的inode号是有上限的。
+
+	
+
+inode满的情况：
+
+开发产生的临时小文件
+
+误操作了脚本
+
+crontab没定向也没开邮件服务。
+
+
+
+inode原理：
+
+inode文件索引，指针指向block。
+
+block 存储空间，4k为单位。
+
+
+
+raid：
+
+raid具体操作需要看具体服务器的主板厂商给的手册。
+
+名称 盘数 冗余 备注
+
+raid0 >=1 0 最快
+
+raid1 =2 1,50% 最安全
+
+raid5 >=3 1 只适合流量常年波动不大的地方
+
+raid10 >=4 50% 又快又安全
+
+
+
+傀儡用户/虚拟用户：
+
+-M 没有家 ； -s /sbin/nologin 不能登录的shell
+
+
+
+生成复杂密码：
+
+存密码的命令：keepass
+
+生成密码的其中一条命令：openssl rand -base64 14
+
+
+
+给别人授权：
+
+visudo 第100行 可以编辑某个用户可以使用的命令权限，三选一
+
+oldboy ALL=(ALL) /usr/bin/su # 一般
+
+oldboy ALL=(ALL) ALL # 最简单
+
+oldboy ALL=(ALL) NOPASSWD: ALL # 最危险
+
+oldboy ALL=(ALL) ALL,!/usr/bin/rm #取反，部分不能用
+
+
+
+切换用户：
+
+sudo su -
+
+sudo su - root
+
+sudo su - oldboy
+
+1，输入自己密码是有时效性的
+
+2，sudo -k 可以手动清理密码
+
+3，sudo -l 可以查看当前权限状态
+
+
+
+
+
+day17 精简回忆笔记
+
+x 1 w 2 r 4
+
+chmod 755 file
+
+chmod u+x file
+
+chmod u+s file
+
+chmod u-s file
+
+lsattr file
+
+chattr +i file
+
+chattr +a file2
+
+chattr -i file
+
+chattr -a file2
+
+umask 文件有奇数位对应结果+1
+
+umask 文件夹不用管奇偶
+
+dir:777-umask
+
+file:666-umask
+
+
+
+文件系统类型 补充,装PVE时：
+
+通用万金油：linux: EXT4 windows: NTFS
+
+极端服务器：linux: xfs windows:ReFS
+
+
+
+精简配置:用多少占多少，省资源。LVM-thin 和 ZFS 和 Directory的qcow2
+
+独占模式:LVM 和 Directory的raw
+
+
+
+气球，开机时扩缩虚拟硬盘。
+
+
+
+PVE的ZFS格式格式化过程：
+
+zpool create -f -o ashift=12 Mortis /dev/sdb # 一行命令分区
+
+zfs set compression=lz4 Mortis # 启动压缩
+
+
+
+ps：
+
+用户态us，内核态sy
+
+优先级ni，剩余id
+
+等待IOwait，硬中断hi
+
+软中断si，虚拟化的cpu占用st
+
+
+
+ln -s /bin/软链接 .tar /tmp/软链接 .tar
+
+find / -type f -name * -size +10M -mtime -1 -exec pwd \;
+
+
+
+2026年7月11日
+
+补路由器和交换机的知识，属于给自己过去没好好学买单了。很快就补上了，挺简单的。只是之前讨厌学校集体压抑的学习氛围。来自ai。
+
+一、二层接入交换机（精准定义：创建VLAN、端口划入对应VLAN、上联Trunk放行VLAN）
+
+ 
+
+system-view
+
+ 
+
+1.创建VLAN：从无到有生成10/20/30/40/50虚拟局域网
+
+ 
+
+vlan batch 10 20 30 40 50
+
+ 
+
+2.端口划入VLAN：将物理接入端口分配至指定VLAN（终端口为Access模式）
+
+ 
+
+interface GigabitEthernet 0/0/1
+
+port link-type access
+
+port default vlan 10
+
+ 
+
+interface GigabitEthernet 0/0/2
+
+port link-type access
+
+port default vlan 20
+
+ 
+
+interface GigabitEthernet 0/0/3
+
+port link-type access
+
+port default vlan 30
+
+ 
+
+interface GigabitEthernet 0/0/4
+
+port link-type access
+
+port default vlan 40
+
+ 
+
+interface GigabitEthernet 0/0/5
+
+port link-type access
+
+port default vlan 50
+
+ 
+
+3.上联端口配置Trunk：允许多VLAN标签数据跨设备传输（二层→三层透传VLAN数据）
+
+ 
+
+interface GigabitEthernet 0/0/24
+
+port link-type trunk
+
+port trunk allow-pass vlan 10 20 30 40 50
+
+ 
+
+save
+
+ 
+
+二、三层核心交换机（精准定义：创建对应VLAN、对接端口放行VLAN、配置VLANIF三层网关实现跨VLAN路由）
+
+ 
+
+system-view
+
+ 
+
+1.创建VLAN：与二层交换机保持一致，生成对应VLAN数据单元
+
+ 
+
+vlan batch 10 20 30 40 50
+
+ 
+
+2.对接端口Trunk放行：接收二层透传的多VLAN带标签数据
+
+ 
+
+interface GigabitEthernet 0/0/1
+
+port link-type trunk
+
+port trunk allow-pass vlan 10 20 30 40 50
+
+ 
+
+3.配置VLANIF虚拟三层接口（跨VLAN互通核心）：为每个VLAN配置网关IP，实现三层路由转发
+
+ 
+
+interface Vlanif 10
+
+ip address 192.168.10.1 255.255.255.0
+
+ 
+
+interface Vlanif 20
+
+ip address 192.168.20.1 255.255.255.0
+
+ 
+
+interface Vlanif 30
+
+ip address 192.168.30.1 255.255.255.0
+
+ 
+
+interface Vlanif 40
+
+ip address 192.168.40.1 255.255.255.0
+
+ 
+
+interface Vlanif 50
+
+ip address 192.168.50.1 255.255.255.0
+
+ 
+
+save
+
+ 
+
+三、终端IP规划（精准对应各VLAN网关）
+
+ 
+
+VLAN10终端：IP 192.168.10.2-254 网关 192.168.10.1
+
+VLAN20终端：IP 192.168.20.2-254 网关 192.168.20.1
+
+VLAN30终端：IP 192.168.30.2-254 网关 192.168.30.1
+
+VLAN40终端：IP 192.168.40.2-254 网关 192.168.40.1
+
+VLAN50终端：IP 192.168.50.2-254 网关 192.168.50.1
+
+ 
+
+
+
+
+
+网络第一天知识点整理：
+
+2026年7月12日 02点39分
+
+安装：
+
+#思科模拟器可以设置防火墙断网。
+
+#win11推荐8.2.2版本。
+
+碎片隐形知识：
+
+fa百兆
+
+ge万兆
+
+e千兆
+
+路由器
+
+交换机
+
+三层交换机
+
+核心交换机
+
+24口，48口
+
+ap，PoE供电
+
+生成树协议解决网络环路
+
+划分vlan解决网络风暴
+
+access是一条线，stuck是一族线
+
+接口编号按照接入时间
+
+思科交换机是傻瓜式的
+
+路由必须配置才能用
+
+路由设置网关的命令：
+
+enable #特权模式
+
+config t #配置
+
+int fa0/0 #配置00口
+
+ip address 11.22.33.1 255.255.255.0 #给路由器配置一个网关，网关的作用：原本局域网隔离的网络的出口，算是媒人。
+
+no shut #保存
+
+
+
+2026年7月15日 
+
+第一阶段基本结束，整理网络部分
+
+[还剩一个回顾没看，不是很想看]
+
+TCP握手和挥手的基本规则：
+
+1, seq序列号是给包设置的编号
+
+2, 三个消耗seq的信号SYN-DATA-FIN
+
+3, ack是预计对方下一个seq的值
+
+4, a的seq和b的seq是相互独立的
+
+
+
+启动三次握手流程:
+
+a:[SYN] seq=1
+
+b:[SYN, ACK] seq=2,ack=2
+
+a:[ACK] seq=2,ack=3
+
+
+
+TCP四次挥手流程:
+
+b:[FIN] seq=1, ack=999
+
+a:[ACK] seq=999, ack=2
+
+a:[FIN] seq=999, ack=2
+
+b:[ACK] seq=2, ack=1000
+
+
+
+TCP延迟的情况下, ACK包可以携带FIN, 最后实现挥手过程是三次:
+
+b:[FIN] seq=1, ack=999
+
+a:[ACK, FIN] seq=999, ack=2
+
+b:[ACK] seq=2, ack=1000
+
+
+
+OSI七层模型补充:
+
+应用层
+
+表示层 数据的格式化、加密和压缩
+
+会话层 会话管理
+
+传输层
+
+网络层
+
+数据链路层
+
+物理层
+
+
+
+路由器命令:
+
+#配置接口
+
+en #特权模式
+
+config t #配置
+
+int fa0/0 #配置fa0/0口
+
+ip address 11.22.33.1 255.255.255.0 #设置fa0/0口的地址
+
+no shut
+
+#动态网关
+
+route rip
+
+network 192.168.2.0
+
+#静态网关
+
+ip route 11.22.33.44 255.255.255.0 192.168.2.2 
+
+#查看配置
+
+show ip route
+
+shu run
+
+
+
+网络设备快速回顾:
+
+AP,PoE供电,二层交换机,接入层. 
+
+三层交换机, 有路由功能, 有的公司甚至直接把三层交换机代替路由器, 只买一台交换机. 汇聚层, 核心层. 
+
+路由连接网段, 两个口, 主要用来出局域网上网. 
+
+
+
+小知识点：
+
+1，Linux发行版，充当路由，RouterOS
+
+2，iptables也有路由的功能
+
+3，看网关route -n ; ip rule ; ip route
+
+4，ip add del 10.0.0.201/24 dev eth0
+
+5，ip route del 0/0 via 10.0.0.2
+
+6，ip route add 0/0 via 10.0.0.2 #新命令
+
+7，route del default gw 10.0.0.2 #旧命令
+
+8，ARP -d 清空arp缓存
+
+9，划分vlan解决网络风暴
+
+10，STP生成树协议解决环路阻塞
+
+11，百千万兆，超五类、六类、超六类、七类及八类网线，弱电强电
+
+12，ARP协议，广播，mac欺骗，Windows下的物理地址设置方法
+
+13，二十年前的简单示例：让局域网内的人请求一个虚假的网关,让自己去请求真实网关,减少竞争,提高网速
