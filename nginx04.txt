@@ -1,0 +1,145 @@
+nginx04.txt
+
+---------------- 反向代理 ----------------
+
+nginx代理的协议:
+fastcgi不算完整的代理，因为静态资源没有被处理。
+http/https	http/https	http server
+tcp			tcp/udp		tcps server
+websocket	http1.1		socket server
+grpc		go语言		grpc server
+pop/imap	邮件转发		mail server
+rtmp		流媒体		media server
+nginx常用代理模块:
+ngx_http_proxy_module
+ngx_http_fastcgi_module
+ngx_http_uwcgi_module
+ngx_http_proxy_module
+ngx_http_v2_modul
+
+#根本不用那么麻烦，一个include proxy_params;就足够了。
+1，proxy_pass 可以直接转发4层的流量
+2，proxy_pass 反向代理掌握后，才能掌握负载均衡
+3，proxy_pass 需要搭配转发头才能真正识别到网站
+4，真正有10万并发的时候，nginx的65535个端口根本不够用
+5，大部分公司都用七层代理
+6，小部分的大流量公司，用4层代理来解决65535端口不够用问题
+
+涨经验:配置nginx的时候记得多看error
+涨经验:配置反向代理的时候记得多看wireshark
+proxy_pass丢了协议:proxy_http_version 1.1;
+proxy_set_header Host $http_host;
+proxy_set_header X-Real-IP $remote_addr;
+proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#http2并发会带来新的问题
+proxy_buffer_size 8k; #存在内存里，是头
+http = 请求头部 + 内容
+为了保证数据包的完整，必须加上大量和复杂的proxy_header
+
+
+---------------- 负载均衡 ----------------
+
+面试题 nginx负载均衡方式: rr轮询 wrr加权轮询 ip_hash url_hash 最小连接数
+
+proxy_pass #可以带http,走七层 ; 可以只有ip:port,走四层
+七层:rewrite url转发 域名跳转
+四层:ssh连接 mysql连接
+
+proxy_next_upstream error timeout http_500 http_502 http_503 http_504; #不访问，下一个
+
+调度算法:
+#rr轮询 配置相同时轮询
+upstream web01 {
+	server 192.168.0.1;
+	server 192.168.0.2;
+	server 192.168.0.3;
+}
+#加权 wrr 解决配置不一致
+upstream web02 {
+	server 192.168.0.1 weight=5; #访问五次下一个
+	server 192.168.0.2 weight=1; #访问一次下一个
+	server 192.168.0.3 weight=1; #访问一次下一个
+}
+#ip_hash 按照ip的hash结果轮询
+#效果是如果第一次找到了这一台，以后一直找这一台 
+#好处坏处: 会话保持 但是负载不均衡
+upstream web03 {
+	ip_hash;
+	server 192.168.0.1;
+	server 192.168.0.2;
+	server 192.168.0.3;
+}
+#url_hash 用不到
+#最小连接数 用不到
+
+---------------- 状态 ----------------
+
+upstream webs {
+	server 192.168.0.1 down; #不参与调度
+	server 192.168.0.2 backup;  #其他主机都挂掉后，用这台 很少用这个参数
+	server 192.168.0.3 max_fails=2 fail_timeout=10s; 
+	check interval=3000 rise=2 fall=3 timeout=1000 type=tcp;
+}
+
+---------------- 编译安装模块 ----------------
+
+#nginx_upstream_check
+
+yum -y install gcc gcc-c++ make pcre pcre-devel zlib zlib-devel openssl openssl-devel
+
+nginx/1.30.4
+
+wget https://nginx.org/download/nginx-1.30.4.tar.gz
+wget https://github.com/yaoweibin/nginx_upstream_check_modul
+e/archive/v0.3.0.tar.gz
+
+#有专门打补丁的命令 patch 部分模块是必须打补丁的 -p0在nginx目录/-p1不在nginx目录
+patch -p1 < ../nginx_upstream_check_module/ #这里tab找一个最接近当前nginx版本的补丁
+
+#添加模块的配置 nginx -V
+--add-module=/code/nginx_upstream_check # 这个加的很有讲究，要紧贴--with-xxx之后。
+
+cd /code/nginx
+configure
+make
+make install
+
+Tengine 是 nginx 的升级版，内嵌nginx_upstream_check
+check_status用法stub_status一致
+
+---------------- 编译安装 ----------------
+一般是这几个情况: 
+1，路径不一致
+2，不要某些模块
+3，要某些模块
+去一台有nginx的主机上获取模块
+
+---------------- 会话保持 ----------------
+NFS 太慢
+MySQL 开源的项目常常写mysql
+memcache
+redis
+
+nginx负载均衡web01 web02后 cookie不能保存。
+1，用ip_hash
+2，同步会话
+
+redis 同步会话需要:
+1, 
+   redis.conf #修改bind
+2, 
+   php.ini 
+   session.save_handler = redis #默认是file
+   session.save_path = "tcp://192.168.0.1:6379" #redis默认没有密码
+   #session.save_path = "tcp://192.168.0.1:6379?auth=123456789" #如果有密码
+3, 
+   php-fpm.d/www.conf 
+   注释php_value[session.save_handler] = files
+   注释php_value[session.save_path] = /var/lib/php/session
+
+多个nginx代理时，获取真实用户IP地址:
+set_real_ip_from 
+real_ip_header 
+real_ip_recursive 
+
+redis会话 五种负载均衡 nginx编译 七层四层负载均衡
