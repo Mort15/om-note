@@ -1,0 +1,156 @@
+nginx05.txt
+if业务判断 动静分离 LVS和nginx虚拟四层代理区别 ab压测
+
+#除了BAT，很少有公司配LVS 但是这是面试题
+四层代理:
+	nginx假四层
+	HAproxy
+	LVS
+LVS四个模式:
+	DR模式 直接路由
+	NAT 相当于代理
+	TUN隧道
+PPTP 部署的是 VPN
+
+#直接跳过php-fpm,动静分离.
+loaction ~* \.(png,jpg,svg,mp4,mp3) {
+	root /code/images;
+}
+
+charset utf-8,gbk;
+
+#业务判断
+if ($http_user_agent ~* Android") {
+proxy_pass http://android;}
+if ($http_user_agent ~* "Iphone") {
+proxy_pass http://iphone;}
+if ($http_user_agent ~* "MSIE") {
+return 403;}
+proxy_pass http://pc;
+
+#其他演示
+if ($remote_addr ~* "10.0.0.1") {
+	return 403;
+}
+
+-----------ab压测-----------
+ab -n20000 -c 2 http://127.0.0.1/
+-n总请求20000次
+-c并发200
+-----------rewrite-----------
+这个公司里用的很多
+因为改代码很麻烦，而改nginx很轻松
+server {
+	listen 80;
+	server_name a.com;
+	root /code/test;
+
+	location / {
+		rewrite /1.html /2.html;
+		rewrite /2.html /3.html;
+	}
+	location /2.html {
+		rewrite /2.html /a.html;
+	}
+	location /3.html {
+		rewrite /3.html /b.html;
+	}
+# last;  break; 两个
+}
+-----------rewriteFlag-----------
+
+last #内部用,重走server
+break #内部用,重走location
+redirect #外部用 302 临时重定向 等效return
+permanent #外部用 301 永久重定向 ，永久跳转的缓存会保存在客户端
+
+1,rewrite ^(.*)$ http://www.baidu.com redirect; #302
+2,rewrite ^(.*)$ http://www.baidu.com permanent; #301
+3,return 302 http://xx.xx 和 rewrite aa bb redirect 效果一样。
+4,return 301 http://xx.xx 和 rewrite aa bb permanent 效果一样。
+5,两者效果相同		
+rewrite ^(.*)$ http://www.baidu.com; #必须精确匹配整个 URI
+rewrite (.*) http://www.baidu.com; #.*贪婪匹配，直接吞噬掉整个 URI 字符串直到末尾
+rewrite_log on;
+#######互相引用过去的页面#######
+server {
+	listen 80;
+	location /2026 {
+		rewrite ^/2026/(.*)$ /2011/$1 redirect;
+	}
+}
+#########灵活引用参数###########
+server {
+	listen 80;
+	location /2026 {
+		rewrite ^/course-(.*)-(.*)-(.*).html$ /course/$1/$2/$3/course_$3.html redirect;
+		rewrite ^/course(.*)$ /course/11/22/33/course_33.html redirect;
+	}
+}
+###########另一种跳转@写法##################
+error_page 403 404 500 501 502 @error_test;
+	location @error_test {
+		rewrite ^(.*)$ /404.html break;
+	}
+-----------rewrite案例1-----------
+#给指定的ip的url添加请求路劲，并且携带着过去的参数
+server {
+	listen 80;
+	#args是nginx内置变量，意义是请求的参数。
+	set $args "&showoffline=1";
+	location / {
+		root /code;
+		index index.html;
+	}
+	if ($remote_addr = 10.0.0.1) {
+		rewrite (.*) http://10.0.1.1/admin$1;
+	}
+}
+-----------rewrite案例2-----------
+#网站维护时，指定IP正常访问，其他ip跳转维护页
+server {
+	listen 80;
+	server_name ebilibili.com;
+	root /code;
+	charset utf-8,gbk;
+
+	location / {
+		root /code;
+		set $ip 0;
+		if ($remote_addr = "10.0.0.1") {
+			set $ip 1;
+		}
+		if ($ip = 0) {
+			rewrite ^(.*)$ /wh.html break;
+		}
+		index index.html;
+
+	}
+}
+# 这样可以模糊匹配 if ($remote_addr ~* "^10\.0\.0\.") { ... }
+
+Nginx内置参数
+$args - 这个变量等于请求行中的参数。  
+$content_length - 请求头中的Content-length字段。  
+$content_type - 请求头中的Content-Type字段。  
+$document_root - 当前请求在root指令中指定的值。  
+$host - 请求主机头字段，否则为服务器名称。  
+$http_user_agent - 客户端agent信息。  
+$http_cookie - 客户端cookie信息。  
+$limit_rate - 这个变量可以限制连接速率。  
+$request_body_file - 客户端请求主体信息的临时文件名。  
+$request_method - 客户端请求的动作，通常为GET或POST。  
+$remote_addr - 客户端的IP地址。  
+$remote_port - 客户端的端口。  
+$remote_user - 已经经过Auth Basic Module验证的用户名。  
+$request_filename - 当前请求的文件路径，由root或alias指令与URI请求生成。  
+$query_string - 与$args相同。  
+$scheme - HTTP方法（如http、https）。  
+$server_protocol - 请求使用的协议，通常是HTTP/1.0或HTTP/1.1。  
+$server_addr - 服务器地址，在完成一次系统调用后可以确定这个值。  
+$server_name - 服务器名称。  
+$server_port - 请求到达服务器的端口号。  
+$request_uri - 包含请求参数的原始URI，不包含主机名，如：”/foo/bar.php?arg=baz”。  
+$uri - 不带请求参数的当前URI，$uri不包含主机名，如”/foo/bar.html”。  
+$document_uri - 与$uri相同。
+
