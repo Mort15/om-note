@@ -1,0 +1,56 @@
+过程，没听懂。
+
+DV域名型
+个人用，小锁，免费
+如果被破解了，没赔付
+
+OV企业型
+企业用，小锁
+
+EV增强型
+有字，并非小锁
+
+价格几千几万一年
+颁发时间几分钟到一周，单次申请年限一两年，赔偿100到175万美金
+
+1，https不支持续费，每次都是购买
+2，相当于定期换锁。
+3，不支持三级域名，如test.www.ebilibili.com
+4，绿色，整个网站都是https的。
+5，黄色，整个网站内包含http链接。
+6，红色，证书过期，或者是假的。
+
+自签名,会粘贴复制就行,公司不用。
+mkdir -p /etc/nginx/ssl_key ; cd /etc/nginx/ssl_key
+opensssl genrsa -idea -out server.key 2048
+ssl_certificate ssl_key/server.crt;
+ssl_certificate_key ssl_key/server.key;
+#注意https的php解析需要加上这一行
+fastcgi_param HTTPS on;
+
+如果不交易，其实用免费的也不是不行，但是要提前把危害说清楚。
+免费一般是3月续费一次。
+一般公司也不省这个钱。
+只有第一台入口nginx装ssl证书就行。
+怎么感觉这一节课也没讲什么东西。
+
+1，两台业务完全相同，挂了自动切换
+2，硬件用F5，软件用keepalived
+3，在七层负载的中间
+4，Master复活后，Slave要不要让。
+5，Master和Slave不能通信时，都活着抢ip时。
+6，vip有对应的虚拟mac，动态的mac，ip在哪mac就在哪。
+7，选举:谁近选谁，也可以手动定义票数
+8，主要是mac的原因，并且arp欺骗繁琐的原因，所以不能手动的拔插
+9，一个域名一次只有一个ip，单点死后 -> ip漂移
+10，虚拟化分割资源ESXI
+11，keepalived 用 vrrp 虚拟路由冗余协议 实现的
+12，一秒接收不到心跳包，立马就抢ip
+13，keepalived抢占模式:Master死->转移Slave
+14，都以为自己是老大，互相都收不到信息，都有vip，脑裂。
+15，相互丢掉对方的信息就会脑裂:双方开启防火墙，网络延迟，交换机老化，网卡老化等等。
+16，临时修复脑裂:干掉一个。
+17，keepalived是单独一个服务，不认其他服务如nginx mysql。nginx挂掉，keepalived是不管的。
+18，将keepalived和nginx结合，让keepalived监控nginx。写脚本监控
+19，vim (大写D/d$)删除到行末尾 ，(dG)删除到文件末尾，(d0)删除到行首
+20，yum install -y keepalived;vim /etc/keepalived/keepalived.conf
