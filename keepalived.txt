@@ -1,0 +1,175 @@
+#-----------部署keepalived01-----------
+yum install keepalived -y
+cat > /etc/keepalived/keepalived.conf << EOF
+global_defs {
+    router_id lb01
+}
+
+vrrp_instance VI_1 {
+    state MASTER
+    interface eth0
+    virtual_router_id 50
+    priority 150
+    advert_int 1
+
+    authentication {
+        auth_type PASS
+        auth_pass 1111
+    }
+
+    virtual_ipaddress {
+        10.0.0.3
+    }
+}
+EOF
+systemctl start keepalived
+systemctl enable keepalived
+# global_defs {               #全局变量
+#     router_id lb01          # 标识身份 -> 名称
+# }
+#
+# vrrp_instance VI_1 {
+#     state MASTER            # 标识角色状态
+#     interface eth0          # 网卡绑定接口
+#     virtual_router_id 50    # 虚拟路由id
+#     priority 150            # 优先级
+#     advert_int 1            # 监测间隔时间（秒）
+#
+#     authentication {
+#         auth_type PASS      # 认证方式
+#         auth_pass 1111      # 认证密码
+#     }
+#
+#      virtual_ipaddress {
+#          10.0.0.3            # 虚拟的VIP地址
+#      }
+# }
+#-----------部署keepalived02-----------
+#改三处lib02,backup,priority
+global_defs {
+    router_id lb02
+}
+
+vrrp_instance VI_1 {
+    state BACKUP
+    interface eth0
+    virtual_router_id 50
+    priority 100
+    advert_int 1
+
+    authentication {
+        auth_type PASS
+        auth_pass 1111
+    }
+
+    virtual_ipaddress {
+        10.0.0.3
+    }
+}
+#-----------nopreempt不抢占-----------
+arp -a #看 mac
+每次启动keepalived的时候，会发送arp广播
+keepalived默认是抢占，会丢一个数据包
+虽然都是BACKUP，但是priority优先级依然保持150和100
+一般一主一备，可以一主两备
+
+global_defs {
+    router_id lb01
+}
+
+vrrp_instance VI_1 {
+    state BACKUP
+    interface eth0
+    virtual_router_id 50
+    priority 150
+    advert_int 1
+    nopreempt
+    authentication {
+        auth_type PASS
+        auth_pass 1111
+    }
+
+    virtual_ipaddress {
+        10.0.0.3
+    }
+}
+
+# diff:
+# 1,两个配置都写 nopreempt 
+# 2,不抢占就没有主，两个都是BACKUP
+# 3,不抢占就意味着，两台BACKUP会相互谦让，谁在，谁继续。
+
+global_defs {
+    router_id lb02
+}
+
+vrrp_instance VI_1 {
+    state BACKUP
+    interface eth0
+    virtual_router_id 50
+    priority 100
+    advert_int 1
+    nopreempt
+    authentication {
+        auth_type PASS
+        auth_pass 1111
+    }
+
+    virtual_ipaddress {
+        10.0.0.3
+    }
+}
+
+#-----------脑裂-----------
+现象：Master和Slave都活着，并且相互感受不到对方，都认为自己是老大。
+原因：网线松了，硬件老了，老鼠咬了，防火墙错了，网不通了。
+表现：脑裂一瞬间，最后的广播消息，MAC会存到其他主机上。
+结果：其他主机只认最后一次发送MAC的主机。
+解决：先停掉一个，业务临时恢复正常，然后去分析什么导致的。
+firewall-cmd --zone=public --add-port=80/tcp --permanent
+firewall-cmd --zone=public --add-port=443/tcp --permanent
+firewall-cmd --add-service=http
+
+#只有接触到物理机才接触到keepalived，所以现在没人问keepalived了。
+#云平台底层自动高可用。花钱买服务的。
+#能ping通，并且备份节点还有vip -> 脑裂 -> 自动杀死自己。
+#!/bin/sh
+
+vip=10.0.0.3
+lb01_ip=10.0.0.5
+while true;do 
+    ping -c 2 $lb01_ip &> /dev/null
+    if [ $? -eq 0 -a $(ip add | grep "$vip" | wc -l) -eq 1 ]; then
+        echo "HA_ERROR_11111111111"
+    else 
+        echo "OK"
+    fi
+sleep 5
+done
+
+#-----------keepalived绑定nginx-----------
+
+cat >check_nginx.sh<<EOF
+Nginx=$(ps aux | grep nginx | grep -v grep | wc -l) #取nginx的进程数量
+if [ $Nginx -eq 0 ];then #nginx为0，不存在了
+    systemctl restart nginx &>/dev/null #输出结果定位到空
+    if [ $? -ne 0 ];then #如果启动没成功，执行结果为0时
+        systemctl stop keepalived #就停止keepalived
+    fi
+fi
+EOF
+chmod +x check_nginx.sh
+sh -x check_nginx.sh #调试
+
+vim /etc/keepalived/keepalived.conf
+vrrp_script check_web {
+    script "/root/check_nginx.sh"
+    interval 5 #每5秒执行一次，执行脚本的时间必须在5秒内
+}
+
+vrrp_instance VI_1 {
+    #.....追加到尾
+    track_script {
+        check_web
+    }
+}
