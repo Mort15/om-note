@@ -1,0 +1,213 @@
+ansible.txt
+---------CMDB--------
+自动化运维工具集成到可视化的平台CMDB。
+例子：一键收集日志。
+原因：写了平台之后，公司就可以招一个3000看监控就行。
+注意：CMDB不一定适合所有公司，需要看具体的业务。
+
+-----ansible取代saltstack原因------
+原因1：ZeroMQ调试难
+原因2：企业更看重稳定性而非速度
+原因3：社区与人才，招聘难，而且贵
+原因4：学习曲线
+
+-----------ansible架构----------
+只有服务端
+连接插件 连接终端
+核心模块 具体内容
+自定义模块 自定义，用的少
+插件 
+剧本 批量执行
+主机清单 管理客户端
+Invertory 管理哪些主機
+ad-hoc 单行命令
+Playbook xxx.yml
+module 
+ip * N -> Invertory 单台/小组
+ad-hoc * N -> Playbook
+-------ansible配置文件生效顺序---------
+$ANSIBLE_CONFIG #几乎不用 ANSIBLE_CONFIG=/opt/ansible.cfg
+./ansible.cfg #ansible迁移时经常用
+~/.ansible.cfg #几乎不用
+/etc/ansible/ansible.cfg #用的最多
+-------ansible.cfg---------
+inventory 主机目录
+forks 并发进程数
+ask_sudo_pass 权限不够时用
+host_key_checking = False 关闭检测主机指纹,就是ssh第一次连接时有个输入yes的主机检查
+----------hosts---------
+#dG 清理注释
+10.0.0.7 ansible_ssh_user=root ansible_ssh_port=22 ansilbe_ssh_pass='1'
+ansible 10.0.0.7 -m ping 
+#实际上ansible_ssh_user是当前登录的用户，ansible_ssh_port=22是默认的端口
+#也就是说，如果是root登录的ansible，那么只需要配置一个ansible_ssh_pass='1'就行
+web02 ansible_ssh_pass='1'
+#可以给别名指定ip，但是第一列才是主机清单，这里找不到10.0.0.8，只能找到web01(第一列的内容)
+web01 ansible_ssh_host=10.0.0.8 ansilbe_ssh_pass='1'
+#可以用区间写ip
+10.0.0.[7:8] ansible_ssh_pass='1'
+#设置小组
+[webs]
+web01 ansible_ssh_host=10.0.0.7 ansible_ssh_user=root ansible_ssh_port=22 ansible_ssh_pass='1'
+web02 ansible_ssh_host=10.0.0.8 ansible_ssh_user=root ansible_ssh_port=22 ansible_ssh_pass='1'
+www.ebilibili.com ansible_ssh_pass='1'
+#小组符号是切割符号:如果上面有小组，那么下面不管换多少行，都在webs组，除非你新建一个组给隔断
+[dbs]
+mewtype.band ansible_ssh_pass='1'
+#如果免密钥，直接写地址就行了。
+ssh-copy-id -i .ssh/id_rsa.pub 192.168.0.1
+ssh-copy-id -i .ssh/id_rsa.pub 192.168.0.2
+ssh-copy-id -i .ssh/id_rsa.pub 192.168.0.3
+[niub]
+web01 ansible_ssh_host=192.168.0.1
+192.168.0.2
+web03 ansible_ssh_host=192.168.0.3
+[bangdream:children] #组套组
+mewtype
+mygo
+mujica
+niub
+webs
+dbs
+[webs:vars]
+ansible_ssh_port=2222 #给整个组定义变量，用的很少
+#查看组内成员
+ansible webs --list-hosts
+ansible niub --list-hosts
+ansible bangdream -m ping
+ansible all -m ping -i ./hosts --list-host #主动指定hosts文件
+----------Ansible-Adhoc---------
+#umount -lf /mnt/my_mount 补充命令，强行取消挂载
+#adhoc是临时命令，执行完就结束。相当于 ssh 10.0.0.7 'df -h'
+#绿色没被改  黄色有变更  红色故障 紫色host有问题
+#state:absent 缺席->删除
+#state:present 出席->安装
+1，command模块，不建议用： 1，和手动ssh一样了。2，不支持管道。
+ansible web01 -m command -a 'df -h'
+2，shell模块， 在实在不知道用啥的时候用。
+3，scripts模块，专门使用脚本。 很少用
+4，yum模块
+----------在实践中学习模块---------
+
+安装nfs-utils
+配置nfs-utils
+启动nfs-utils
+
+ansible-doc yum #搜索EXAMPLES
+ansible web01 -m yum -a 'name=nfs-utils state=present'
+state:
+	present	安装
+	absent	卸载 删除
+	lastest	最新版
+	touch 创建文件
+	directory 创建目录
+	recurse 递归
+模块:
+	file
+	copy
+	user
+	group
+	db
+	mount
+	systemd
+
+ansible-doc file #/EXA
+ansible webs -m file -a 'path=/root/ansible state=touch'
+冷门知识点:
+	紫色的undefined host问题
+	 -a -> args 参数
+	12位权限位0755
+	9位权限位755
+----------Playbook---------
+playbook是ad-hoc的编排
+playbook可以重复使用
+playbook可以用package自动匹配需要的模块
+冒号后面有东西，必须紧跟一个空格
+冒号后面没东西，后面必须清空
+空格最好一次空两次，原因很简单，因为横杠搭配空格正好是两个字符，此外官网也是空两个
+- hosts: web01	#play: 指定客户端
+  tasks:		#book: 具体执行的动作
+    - name: install NFS-utils
+      package:
+        name: nfs-utils
+        state: present
+    - name: Configure NFS Server
+      file:
+        path: /data
+        state: directory
+- hosts: web02
+  tasks:
+    - name: xxx
+----------NFS_Playbook---------
+ssh-copy-id -i .ssh/id_rsa.pub 10.0.0.31
+cat exports
+/data 172.16.1.0/24(rw,sync,all_squash,anonuid=666,anongid=666)
+vim ansible/nfs.yml
+- hosts: nfs
+  tasks:
+    - name: Install NFS Server
+      yum:
+        name: nfs-utils
+        state: present
+
+    # - name: Configure NFS Server
+    #   copy:
+    #     src: exports
+    #     dest: /etc/exports
+    #     owner: haha
+    #     group: haha
+    #     mode: 0600
+
+    - name: Configure NFS Server
+      copy:
+        content: "/data/ 172.16.1.0/24(rw,sync,all_squash,anonuid=666,anongid=666)"
+        dest: /etc/exports
+
+    - name: Create www Group
+      group:
+        name: www
+        gid: 666
+        state: present
+
+    - name: Create www User
+      user:
+        name: www
+        uid: 666
+        group: 666
+        shell: /sbin/nologin
+        create_home: false
+
+    - name: Create /data
+      file:
+        path: /data
+        state: directory
+        owner: www
+        group: www
+
+    - name: Start NFS Server
+      systemd:
+        name: nfs
+        state: started
+		#started
+		#stopped
+		#restarted
+		#reloaded
+        enalbe: yes
+
+#检查语法
+ansible-playbook --syntax-check nfs.yml
+#执行
+ansible-playbook nfs.yml
+yum:
+  name: nfs-utils  包名
+  state: 动作 present|absent|latest
+
+copy:
+  #直接编写内容
+  content: "/data/ 172.16.1.0/24(rw,sync,all_squash,anonuid=666,anongid=666)"
+  # src: 源文件
+  dest: /exc/exports 拷贝到客户端具体的位置
+  # owner: 属主
+  # group: 属组
+  # mode: 0600
+
