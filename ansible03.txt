@@ -1,0 +1,263 @@
+jinjia2 vars when loop roles
+-------补充昨天-------
+ansible web01 -m setup --filter="ansible_eth0_address"
+ansible_eth0{"address":"1.2.3.4"} => ansible_eth0_address
+
+notify 会调用 handlers
+
+-------jinjia2用法-------
+
+循环，不常用
+{% for i in EXPR %}
+{% endfor %}
+
+条件
+{% if EXPR %}
+{% elif EXPR %}
+{% else %}
+{% endif %}
+
+注释
+{# COMMENT #}
+
+-------jinjia2实例-------
+
+motd
+Welcome to {{ ansible_hostname }}
+This system ipaddress: {{ ansible_default_ipv4.address }}
+
+copy.yml
+- hosts: webs
+  tasks:
+    - name: copy motd to /root/
+      #template就是jinja2的动态解析
+      template:
+        src: motd
+        dest: /root/
+
+-------jinjia2应用场景-------
+
+#比如拷贝nginx配置文件时，搭配template。
+nginx.conf
+user {{ nginx_user }};
+
+- hosts: web01
+#给nginx_user定义内容
+  vars:
+    - nginx_user: nginx
+  tasks:
+    - name: copy nginx.conf
+      template:
+        src: nginx.conf
+        dest: /etc/nginx/nginx.conf
+
+-------jinja2配置nginx大量ip-------
+{# 注意这不要再用nginx.conf的注释，而是用jinja的注释 #}
+range(7,9)其实是7和8，没有9.
+
+
+upstream {{ server_name }} {
+{% for n in range(21) %}
+  server 172.16.1.{{ n }}:{{ up_port }};
+{% endfor %}
+}
+server {
+  listen 80;
+  server_name {{ server_name }}
+
+  location / {
+    root /code;
+    index index.html;
+    proxy_pass http://{{ server_name }}
+    proxy_set_header Host $http_host;
+  }
+}
+-------jinja2配置keepalived-------
+vrrp_instance Vl_1 {
+  {% if ansible_fqdn == "lb01" %}
+  state MASTER
+  priority 150
+{% else %}
+  state BACKUP
+  priority 100
+{% endif %}
+
+  interface eth0
+  virtual_router_id 50
+  advert_int 1
+  authentication {
+    auth_type PASS
+    auth_pass 1111    
+  }
+  virtual_ipaddress {
+    10.0.0.3
+  }
+}
+
+-------when判断-------
+场景，当一个公司有centos有ubuntu。
+获取ansible内部变量，通过grep找。
+ansible web01 -m setup | grep -i centos
+用when来判断CentOS系统
+- hosts: webs
+  tasks:
+    - name: when
+      yum:
+        name: wget
+        state: present
+      when: ansible_distribution == "CentOS"
+其他主机会有蓝色字体的跳过提示。
+when: ansible_hostname == "web01"
+when: ansible_distribution != "CentOS"
+when: ansible_hostname is match "web01"
+when: ansible_hostname is not match "web01"
+when: ansible_hostname is search "web"
+when: (ansible_hostname is match "web01") and (ansible_default_ipv4.address == "10.0.0.7")
+when: (ansible_hostname is match "web01") or (ansible_default_ipv4['address'])
+
+-------when判断nginx -t-------
+
+#报错不执行，没报错执行。通过when匹配ansible内置变量来判断。
+- hosts: web01
+  tasks:
+#定义变量，同时nginx -t检测配置文件
+    - name: when
+      command: nginx -t
+      register: re_ng
+#忽略报错向下执行
+      ignore_errors: yes
+
+#打印大量内容，从这里判断rc，可以后面删掉
+    - name:
+      debug:
+        msg: "{{ re_ng }}"
+
+#多个when写法
+    - name: restarted nginx server
+      systemd:
+        name: nginx
+        state: restarted
+      when: re_ng.rc == "0"
+      when: re_ng.rc is search "0"
+      when: re_ng.stderr_lines is search "ok"
+#这个match不太准确。有时候行有时候不行。得多尝试。跟mount一样。是软件的问题。
+      when: re_ng.stderr_lines is match "ok"
+
+-------loop-------
+- hosts: web01
+  tasks:
+    - name: Start Nginx PHP Server
+      systemd:
+        name: "{{ item }}"
+        state: started
+      loop:
+        - nginx
+        - php-fpm
+
+- hosts: web02
+  tasks:
+    - name: Start Nginx PHP Server
+      file:
+        name: /root/{{ item.nameee }}
+        owner: "{{ item.ownerr }}"
+        group: "{{ item.groupppp }}"
+        mode: "{{ item.mode }}"
+        state: touch
+      loop:
+        - { nameee: 1.txt, ownerr: root, groupppp: root, mode: "0777" }
+        - { nameee: 2.txt, ownerr: root, groupppp: www, mode: "0600" }
+
+-------loop创建用户实例-------
+#只要一一对应的修改就行了
+test01 uid 777
+test02 uid 888
+
+- hosts: web01
+  tasks:
+    - name: Create test User
+      user:
+        name: "{{ item.name }}"
+        group: "{{ item.group }}"
+        uid: "{{ item.uid }}"
+        shell: "{{ item.shell }}"
+        create_home: "{{ item.home }}"
+        state: present
+      loop:
+        - { name: test01, uid: 777 , shell: /bin/bash, home: true}
+        - { name: test02, uid: 888 , shell: /sbin/nologin, home: false}
+
+-------roles重新编排解耦，解决臃肿问题-------
+#ignore_errors
+1，变量
+2，task
+3，notify
+4，变量注册
+5，handlers
+mkdir roles;cd roles
+ansible-galaxy init nfs
+#会创建一个存储大量文件夹的nsf文件夹。删掉不用的东西
+rm -rf defaults/ meta/ test/ REAMED.md
+#每个文件夹都会有一个main.yml文件
+vim tasks/main.yml
+- name: Install NFS Server
+  yum:
+    name: nfs-utils
+    state: present
+- name: Configure NFS Server
+  template:
+    src: exports
+    dest: /etc/exports
+  notify: Restart NFS Serer
+
+- name: Create group www
+  group:
+    name: "{{ user }}"
+    gid: 666
+
+- name: Create "{{ user }}" user
+  user:
+    name: "{{ user }}"
+    uid: 666
+    group: 666
+    shell: /sbin/nologin
+    create_home: false
+
+- name: Create dir "{{ nfs_dir }}"
+  file:
+    path: "{{ nfs_dir }}"
+    state: directory
+    owner: www
+    group: www
+
+- name: Start NFS Server
+  systemd:
+    name: nfs
+    state: started
+    enabled: yes
+
+vim template/exports
+{{ nfs_dir }} {{ nfs_ip }}(rw,sync,all_squash,anonuid=666,anongid=666)
+
+vim vars/main.yml
+nfs_dir: /data
+nfs_ip: 172.16.1.0/24
+user: www
+
+vim handlers/main.yml
+- name: Restart NFS Server
+  systemd:
+    name: nfs
+    state: restarted
+
+files目录存放普通文件 比如配置文件，不然找不到。
+
+-------roles执行-------
+和生成的nfs目录同级下。
+指定role是nfs
+vim site.yml
+- hosts: all
+  roles:
+    - role: nfs
+      when: ansible_hostname == "nfs"
+
+ansible-playbook --syntax-check site.yml
