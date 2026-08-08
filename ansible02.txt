@@ -1,0 +1,138 @@
+----------ansible变量------------
+- hosts: web01
+  vars: p1: wget
+  tasks:
+  - name: yum test
+    yum:
+      name: "{{ p1 }}"
+      state: present
+
+- hosts: web02
+  vars:
+    - p2: wget
+    - p3: lrzsz
+  tasks:
+  - name: yum test
+    yum:
+      name:
+        - "{{ p1 }}"
+        - "{{ p2 }}"
+      state: present
+
+- hosts: web03
+  vars:
+    pack:
+      - wget
+      - lrzsz
+  tasks:
+  - name: yum test
+    yum:
+      #变量单独处理，就是彩色的
+      name: "{{ pack }}"
+      state: absent
+----------ansible变量列表方式------------
+- hosts: web01
+  vars:
+    - ip: 10.0.0.7
+    - ho: web01
+  tasks:
+    - name: yum test
+      yum:
+        name: /root/{{ ho }}_{{ ip }}
+        state: directory
+#注意路劲必须是白色的，不能有彩色，不能加双引号
+#单独出现变量，必须加双引号
+----------ansible调用文件------------
+- hosts: web01
+  vars_files: ./v1.yml
+  tasks:
+    - name: yum test
+      yum:
+        name:
+          - "{{ p1 }}"
+          - "{{ p2 }}"
+          - "{{ p3 }}"
+          state: present
+----------ansible调用多个文件------------
+- hosts: web01
+  vars_files:
+    - v1.yml
+    - ./v2.yml
+    - v3.yml
+  tasks:
+    - name: yum test
+      yum:
+        name:
+          - "{{ p1 }}"
+          - "{{ p2 }}"
+          - "{{ p3 }}"
+          state: absent
+#注意，这里的v1 v2 v3都不能是列表，列表不能再放进列表里。
+# - "{{ 这就是列表 }}"
+----------ansible给组定义变量------------
+1,只能在当前目录下用
+group_vars 组定义变量
+p1: wget
+p2: lrzsz
+group_vars/all
+p1: wget
+p2: lrzsz
+group_vars/nfs
+name: oldli
+host_vars/web01 主机定义变量
+
+必须用主机清单里的名字命名文件
+
+2,可以在host文件里[webs:vars]定义，可以直接使用。
+官方推荐，不过工作不常用。
+还得和公司其他人统一。 
+
+----------ansible过滤使用内置变量------------
+ansible web01 -m setup #通过这个，获取全部参数
+ansible web01 -m setup -a filter="ipv4"
+ansible web01 -m setup -a filter="default_ipv4_address"
+ansible web01 -m setup -a filter="ansible_eth0_address"
+ansible web01 -m setup -a filter="ansible_all_ipv4_address"
+ansible web01 -m setup -a filter="ansible_fqdn"
+ansible web01 -m setup -a filter="ansible_hostname"
+ansible web01 -m setup|grep ansible_default_ipv4 -A 5 #向下取五行
+- hosts: webs
+  tasks:
+    - name: yum test
+      file:
+        path: /root/{{ ansible_hostname }}_{{ ansible_default_ipv4.address }}
+        state: directory
+层级用 点
+非层级用 下划线
+----------ansible变量注册------------
+- hosts: web01
+  tasks:
+    - name: test
+      command: 'nginx -t'
+      register: result_nginx  #定义时不用花括号
+
+    - name: print result_nginx
+      debug:
+        msg: "{{ result_nginx.rc }}"  #输出rc就是反馈码
+        msg: "{{ result_nginx.stderr_lines }}"  #stderr_lines是反馈结果
+
+
+- hosts: webs
+  vars_files:
+    - a.yml  #调用变量
+  tasks:
+    - name: yum test
+      yum:
+        name: "{{ lamp.framework.php_package }}"
+        state: absent
+
+a.yml
+lamp:
+  framework:
+    web_package: httpd
+    db_package: mariadb-server
+    php_package: lrzsz
+
+
+facts 缓存  cpu 主机名 内存大小
+gather_facts: no #关闭
