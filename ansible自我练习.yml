@@ -1,0 +1,242 @@
+记忆点:
+顺序- hosts tasks - name
+template
+notify
+galaxy
+loop
+state
+present
+absent
+directory
+all_squash
+auto_complete
+通知色-黄色字体-改变 触发 notify 触发name对应的 handlers
+
+
+- hosts: webs
+  tasks:
+    - name: Install Nginx Server
+      yum:
+        name: nginx
+        state: present
+    - name: Configure Nginx Server
+      copy:
+        src: nginx.conf
+        dest: /etc/nginx/nginx.conf
+    - name: Create www Group
+      group:
+        gid: 666
+        name: www
+    - name: Create www User
+      user:
+        uid: 666
+        name: www
+        group: www
+        shell: /sbin/nologin
+        create_home: false
+    - name: Start Nginx Server
+      systemd:
+        name: nginx
+        state: started
+        enabled: yes
+
+
+
+#########################
+
+
+
+- hosts: nfs
+  tasks:
+    - name: Install NFS Server
+      yum:
+        name: nfs-utils
+        state: present
+    - name: Configure NFS Server
+      copy:
+        content: "/data/ 192.168.0.0/24(rw,sync,all_squash,anonuid=666,anongid=666)"
+        dest: /etc/exports
+    - name: Create /data
+      file:
+        path: /data
+        state: directory
+        owner: www
+        group: www
+
+
+
+#########################
+
+
+cat > v1.yml <<EOF
+p1: lrzsz
+p2: wget
+p3: tree
+EOF
+- hosts: web01
+  vars_files: v1.yml
+  tasks:
+    - name: yum test
+      yum:
+        name:
+          - "{{ p1 }}"
+          - "{{ p2 }}"
+          - "{{ p3 }}"
+        state: present
+
+when.yml
+- hosts: web01
+  tasks:
+    - name: when
+      yum:
+        name: wget
+        state: present
+      when: ansible_distribution == "Centos"
+
+- hosts: webs
+  tasks:
+    - name: when
+      yum:
+        name: wget
+        state: present
+      when: ansible_default_ipv4.address == "10.0.0.8"
+      when: (ansible_default_ipv4.address == "10.0.0.8") or (ansible_distribution == "Centos")
+      when: ansible_distribution == "Centos"
+      when: ansible_distribution != "Centos"
+      when: ansible_distribution is match "Centos"
+      when: ansible_distribution is not match "Centos"
+      when: ansible_distribution is search "Centos"
+      when: ansible_distribution is match "Cent*"
+
+- hosts: webs
+  tasks:
+    - name: Start Nginx PHP Server
+      systemd:
+        name: "{{ item }}"
+        state: started
+      loop:
+        - nginx
+        - php-fpm
+
+- hosts: webs
+  tasks:
+    - name: Install wget lrzsz
+      yum:
+        name: "{{ itme }}"
+        state: present
+      loop:
+        - wget
+        - lrzsz
+
+# 需求: 创建1.txt 属主属组root
+#       创建2.txt  属主属组www
+
+- hosts: webs
+  tasks:
+    - name: Create 1.txt 2.txt File
+      file:
+        path: /root/{{ item }}
+        owner: root
+        group: www
+        mode: '0644'
+      loop:
+        - 1.txt
+        - 2.txt
+
+- hosts: webs
+  tasks:
+    - name: Cteate 1.txt 2.txt File
+      file:
+        path: /root/{{ item.name }}
+        owner: "{{ item.owner }}"
+        group: "{{ item.group }}"
+        state: touch
+      loop:
+        - { item.name: 1.txt, owner: root, group: root, mode: 0644 }
+        - { item.name: 2.txt, owner: www, group: www, mode: 0644 }
+
+- hosts: webs
+  tasks:
+    - name: 根据上面的案例，增加权限mode 1.txt 777 2.txt 600
+      file:
+        path: /root/{{ item.name }}
+        owner: "{{ item.owner }}"
+        group: "{{ item.group }}"
+        state: file
+      loop:
+        - { item.name: 1.txt, owner: root, group: root, mode: 0777 }
+        - { item.name: 2.txt, owner: www, group: www, mode: 0600 }
+
+# 创建两个用户:
+# test01  uid 777 允许登录   创建家目录
+# test02  uid 888 不允许登录 不创建家目录
+
+- hosts: webs
+  tasks:
+    - name: 创建两个用户 test01 test02
+      user:
+        name: "{{ item.name }}"
+        shell: "{{ item.shell }}"
+        groups: "{{ item.groups }}"
+        uid: "{{ item.uid }}"
+        append: "{{ item.append }}"
+        create_home: "{{ item.create_home }}"
+      loop:
+        - { name: test01, shell: /sbin/nologin, groups: test01, uid: 777, append: yes, create_home: no }
+        - { name: test02, shell: /sbin/nologin, groups: test02, uid: 888, append: yes, create_home: no }
+
+##########nginx.yml
+- hosts: webs
+  tasks:
+    - name: Install Nginx Server
+      yum:
+        name: nginx
+        state: present
+
+    - name: Configure Nginx Server
+      copy:
+        src: nginx.conf
+        dest: /etc/nginx/nginx.conf
+      notify: Restart Nginx Server
+
+    - name: Start Nginx Server
+      systemd:
+        name: nginx
+        state: started
+        enabled: yes
+
+handlers:
+  - name: Restart Nginx Server
+    systemd:
+      name: nginx
+      state: restarted
+
+问题:
+1,notify为什么放在copy下
+2,notify为什么写的是handlers的name，可以写别人的？
+3,notify是通过name匹配到handlers的，还是写死的 百分百匹配的是handlers?
+4,我的猜想是否正确: copy报错，就去handlers重启nginx。(其实说不通)
+
+答案总结问题:
+1，（即产生了 changed 结果）时才会触发。  你是说 通知色-黄色字体-改变 吗？
+2，只能写 handlers 里定义的 name。 我记住了，其实我感觉多此一举了。除非ansible可以写多个handler？
+3，只认黄色改变，不认红色失败。我记住了。
+
+最终答案: 通知色-黄色字体-改变 触发 notify 触发name对应的 handlers
+
+##########jinja2
+
+
+cat motd
+welcome to {{ ansible_hostname }}
+This system ipaddress {{ ansible_default_ipv4.address }}
+
+cat copy.yml
+- hosts: webs
+  tasks:
+    - name: copy motd to /root/
+      template:
+        src: motd
+        dest: /etc/
+
+
