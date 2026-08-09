@@ -1,0 +1,149 @@
+运维经理角度回答: 你是如何理解运维的价值的? [开放性的问题，思想性的加分题。]
+1, 运维要保证用户体验，进而保证业务安全。
+2, 运维是整个公司除了销售人员，最核心的岗位。
+3, 如果运维人员维护不好业务，会导致用户体验下降，流量流失，用户流失，最终会导致业务流产，公司倒闭。
+
+从全局角度分析，从操作系统，服务，硬件角度。
+
+一些公司的要人要求: 
+1，踏实
+2，有想法，思维活跃。 => 不会的，应该怎么干。思路是？
+
+
+
+- hosts: web01
+  roles:
+    - role: basic
+
+
+- name: Configure REPO
+  yum_repository:
+    name: centos-bases
+    description: Aliyun Yum repo
+    baseurl: http://mirrors.aliyun.com/centos/$releasever/os/$basearch/
+    gpgcheck: no
+    enable: yes
+    state: present
+
+- name: yum install ntpdate
+  yum:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - ntpdate
+    - nginx
+    - wget
+    - tree
+    - net-tools
+    - lrzsz
+    - bash-completion.noarch
+    - bash-completion-extras.noarch
+
+- name: disalbe Firewalld NetworkManager
+  systemd:
+    name: "{{ item }}"
+    state: stoped
+    enalbed: no
+  loop:
+    - firewalld
+    - NetworkManager
+
+- name: disable Selinux
+  selinux:
+    state: disabled
+
+- name: ntpdate 
+  cron:
+    name: "ntpdate"
+    minute： "*/5"
+    job: "/usr/sbin/ntpdate ntp1.aliyun.com"
+
+
+
+- hosts: web02
+  roles:
+    - role: backup
+
+
+#tasks/main.yml
+- name: Install
+  yum:
+    name: rsync
+    state: present
+- name: Configure Rsync Server
+  template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    mode: "{{ item.mode }}"
+  notify: Restart Rsync Server
+  loop:
+    -{ src: rsyncd.conf.j2, dest: /etc/rsyncd.conf, mode: "0644" }
+    -{ src: rsyncd.passwd.j2, dest: /etc/rsyncd.passwd.conf, mode: "0600" }
+
+#rsyncd.conf.j2
+uid = {{ rs_user }}
+gid = {{ rs_user }}
+port = {{ rs_port }}
+path = {{ rs_dir }}
+
+#var
+rs_user: www
+rs_port: 873
+rs_dir: /backup
+
+rpm安装php时，其中用loop指定大量rpm文件会有依赖问题
+用 "{{ packname }}" 变量形式可以自动匹配，解决依赖问题
+ls | xargs -n1 | awk '{print "  - /opt/"$1}'
+
+yum模块 安装服务
+systemd模块 启动关闭服务
+copy模块 配置nginx.conf 配置php.ini
+unarchive模块 解压tar.gz压缩包
+
+注意php.ini 的; 分号要删除掉。 不然ansible会出问题，;会被解析。
+
+
+- name: Install Mariadb Server
+  yum:
+    name: mariadb-server
+    state: present
+
+- name: Start Mariadb Server
+  systemd:
+    name: mariadb
+    state: started
+    enabled: yes
+
+- name: import db
+  mysql_db:
+    name: all
+    state: import
+    target: /root/all.sql
+
+- hosts: db01
+  roles:
+  - roles: basic
+  - role: db
+  when: ansible_hostname == "db01"
+
+- name: Delete Nginx Defult.conf
+  file:
+    path: /etc/nginx/conf.d/default.conf
+    state: absent
+
+- name: Configure Nginx Server
+  unarchive:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+  loop:
+    - { src: wo.tar.gz, dest: /etc/nginx/conf.d/}
+    - { src: code.tar.gz, dest: / }
+
+- name: Restart Nginx Server
+  systemd:
+    name: "{{ item }}"
+    state: restarted
+  loop:
+    - nginx
+    - php-fpm
+
