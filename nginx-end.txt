@@ -1,0 +1,156 @@
+--------最大打开文件数--------
+/etc/security/limits.conf
+* 所有用户  也可以指定用户root 一般用*
+1, 因为有其他瓶颈,实则用不到65535
+2, 这个最大打开文件数是必须做的。
+
+* soft nofile 25535
+* hard nofile 25535
+
+root soft nofile 65535
+root hard nofile 65535
+
+worker_rlimit_nofile 30000
+
+--------面试题--------
+给你一台服务器，你需要做哪些东西，流程是什么？
+1, 做raid, 配置ip
+2, 做系统优化, 把该优化的优化掉
+3, 部署服务, 优化服务, 监控服务
+
+--------端口复用技术--------
+
+time_wait状态端口复用
+
+####
+#开启端口复用
+net.ipv4.tcp_tw_reuse = 1
+#禁用时间戳，不能开启，会出现问题
+net.ipv4.tcp_timestamps = 0
+####
+
+sysctl -p #看添加的内核参数
+sysctl -a #看所有内核参数
+
+不痛不痒: selinux firewalld ntpdate
+ 
+不能轻易去弄: 改内核，改限制
+  - 出问题后再弄
+  - 可能不会解决问题
+  - 反而可能会带来问题
+
+--------改内核导致故障案例--------
+
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.tcp_timestamps = 0
+
+开启tw_reuse必须关timestamps。
+不关？
+网站访问不了。
+是三次握手四次挥手的问题。
+
+
+内部瓶颈防止不够用，所以 upstream 时 keepalived 8秒，外面设60秒。
+
+
+--------缓存的核心过程--------
+etag 客户端是否过期
+last-modified 服务端是否更改旧文件，没改就继续用
+
+--------提速--------
+
+大文件业务用，提前打包再发送。
+tcp_onpush on;
+
+小文件业务用，有数据立马转发。
+tcp_nodelay on;
+
+图片不能随便压，很有可能一开始就压缩过。
+一般效果不大。
+
+--------防盗链--------
+#除了白名单域名，都不许获取。
+
+location ~ .*\.(jpg|png|gif) {
+	valid_referers none blocked *.baidu.com, *.mewtype.band,*.bing.com;
+	if ( $invalid_referer ) {
+		return 403;
+	}
+}
+
+--------配置跨域--------
+
+http请求头控制是否允许跨域
+Access-Control-Allow-Origin
+
+location ~.*\.(html|htm)$ {
+	add_header Access-Control-Allow-Origin *;
+	add_header Access-Control-Allow-Methods GET,POST,PUT,DELETE,OPTIONS;
+}
+
+--------CPU亲和affinity--------
+
+解决性能损耗: 核心数量和Nginx进程不一致时，会不断切换，切换就会导致CPU缓存miss。
+#防止有人不干活，有人干的太多。
+#官方推荐和CPU核心数保持一致
+lscpu
+#查看 nginx worker 绑定对应 cpu
+ps -eo pid,args,psr|grep [n]ginx
+
+#自动就行了  affinity亲和力
+worker_processes auto;
+worker_cpu_affinity auto; #必须设置
+
+
+worker_connections 10240; #大了没事，不能太小
+worker_rlimit_nofile 35535; #每个work能打开的文件描述符上限，不能太小
+
+server_tokens off; #隐藏nginx版本
+client_max_body_size 200m; #上传大小限制
+
+#文件高效传输
+sendfile on;
+tcp_nopush on;
+#实时传输
+tcp_nodelay on;
+keepalived_timeout 65;
+
+#Gzip 压缩
+gzip on;
+gzip_disable "MSIE [1-6]\.";
+gzip_http_version 1.1;
+gzip_comp_level 2;
+gzip_buffers 16 8k;
+gzip_min_length 1024;
+gzip_types text/plain text/css application/json application/x-javascript text/xml application/xml
+application/xml+rss text/javascript image/jpeg;
+
+
+--------nginx面试题，要求能说出一半--------
+1、CPU亲和、worker进程数、调整每个worker进程打开的文件数
+
+2、使用额pool网络模型、调整每个worker进程的最大连接数
+
+3、文件的高效读取sendfile、no铺设
+
+4、文件的传输实时性、nodealy
+
+5、开启tcp长连接,以及长连接超时时间keepalived
+
+6、开启文件传输压缩gzip
+
+7、开启静态文件expires缓存
+
+8、异常nginx版本号
+
+9、禁止通过ip地址访问,禁止恶意域名解析,只允许域名访问
+
+10、配置防盗链、以及跨域访问
+
+11、防DDOS、cc攻,限制单IP并发连接,以及http请求
+
+12、优雅限制nginx错误页面
+
+13、nginx加密传输https优化
+
+14、nginx proxy_cache、fastcgi_cache、uwsgi_cache缓存,第三方工具(squid、varnish)
