@@ -1,0 +1,16 @@
+
+内核占缓存池 40 {
+
+	regedit 定位到：
+	HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management
+
+	右侧新建 DWORD (32位)，命名为 PoolUsageMaximum ，数值填 40（十进制）。
+
+	新建 DWORD，命名为 PagedPoolSize ，数值填 0。
+
+	重启。
+
+}
+
+Windows最恶心的是占着Standby列表不放。直接用微软官方工具 RAMMap 强制踢掉。
+
