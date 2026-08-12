@@ -1,0 +1,135 @@
+tomcat.txt
+
+--------------- tomcat介绍 ---------------
+
+1，本身就可以处理java动态数据
+2，java跑在JVM
+3，jvm是跑完整硬件系统的功能
+4，jvm诞生是为了跨平台
+5，([windows]+[linux]) * jvm
+6，java编译一次 -> jar war 二选一，运行方式不一样 -> 都能放在JVM
+7，jre包含jvm，jvm可以装在任何操作系统，
+8，jdk包含全部，jre仅能运行，jvm是运行需求之一。
+9，tomcat解析静态效率不如nginx，大部分是相结合。
+
+--------------- 语言选择 ---------------
+
+web语言选择: 
+稳: 大型企业用java, 代价是“重”, 启动慢、吃内存
+悍,新宠: 微服务和云原生用go
+开发快: 追求速度用Python, 快是人快，不是机器快
+语言统一: 前端为主用node.js
+简: 个人开发php
+专: 依赖微软用C# .NET
+
+go Go是“够用主义”的巅峰，新时代宠儿。
+   生态不如java，性能不如rust。
+   比java启动快，比rust简单。
+java 极致生态，极致稳定，启动慢
+rust 极致性能，好评如潮，学习困难，用的人少
+
+--------------- 安装tomcat ---------------
+
+mkdir /soft
+tar -xf apache-tomcat-9.0.89.tar.gz -C /soft/
+ln -s /soft/apache-tomcat-9.0.89/ /soft/tomcat
+
+lib #jar包形式的插件扩展 如同 nginx 的模块
+webapps/ROOT #tomcat 放代码必须放在这里
+work #缓存
+catalina #处理http请求
+1，以前tomcat叫catalina; 2，寓意可能是想把Tomcat设计成一个优雅美丽且轻量级的web服务器
+3，/usr/lib/systmd/system/tomcat.service
+4，描述 前提服务 类型 启动 关闭 重启 
+
+--------------- 配置systemctl tomcat---------------
+
+cat >/usr/lib/systmd/system/tomcat.service<<EOF
+[Unit]
+
+Description=Apache Tomcat Server
+After=network. target remote-fs.target nss-lookup.target
+
+[Service]
+Type=forking
+ExecStart=/soft/tomcat/bin/startup.sh
+ExecStop=/soft/tomcat/bin/shutdown.sh
+ExecRetart=/soft/tomcat/bin/shutdown.sh
+&& sleep2 && /soft/tomcat/bin/startup.sh
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+--------------- server.xml ---------------
+
+首先去除注释
+Listener 监听器
+GlobalNamingResources 资源限制，可以在页面上配置域名信息
+1，工作时不会在页面上配置
+2，可以防止客户胡乱配置
+Engine 引擎和 默认主机
+Host 虚拟主机 端口域名站点目录 自动解压war包 自动部署 日志信息
+
+--------------- tomcat请求处理过程 ---------------
+
+http->server[connector(http/https/ajp)->service->Engine(Host)]
+
+</Host>
+
+
+<Host name="localhost" appBase="webapps"
+unpackWARs="true" autoDeploy="true">
+
+<Valve className="org. apache. catalina. valves.AccessLogValve" directory="logs"
+prefix="localhost_access_log" suffix=".txt"
+pattern="%h %l %u %t &quot;%r&quot; %s %b" />
+
+</Host>
+
+##把host块复制一份，改掉域名改掉路径。重启就行。
+
+</Host>
+
+<Host name="diy.etiantian.org" appBase="/code/tomcat"
+unpackWARs="true" autoDeploy="true">
+
+<Valve className="org. apache. catalina. valves.AccessLogValve" directory="logs"
+prefix="etiantian" suffix=".log"
+pattern="%h %l %u %t &quot;%r&quot; %s %b" />
+
+--------------- zrlog ---------------
+
+tomcat只能用war包
+现在更加依赖云原生，一个java -jar 执行jar包
+
+1,tomcat多开
+2,redis认证同步
+3,nfs图片存储
+
+scp -rp 作用
+-r：代表递归
+-p：代表“保留”（preserve）
+
+scp -rp /soft 10.0.0.8:/
+scp -rp /zrlog 10.0.0.8:/
+scp /usr/lib/systemd/system/tomcat.service 10.0.0.8:/usr/lib/systemd/system/tomcat.service
+
+ln -s /soft/apache-tomcat-9.0.34/ /soft/tomcat
+sysetmctl daemo-reload
+systemctl start tomcat
+systemctl enable tomcat
+
+systemctl 排错:
+systemctl cat tomcat
+没装java启动不来tomcat
+yum install --downloadonly java-jdk*
+
+会话保持 redis
+
+redis需要写对应后端代码php或者jsp
+#nginx时 需要调整nginx，需要调整php-fpm
+#tomcat时 session.oldboy.com   /code/session
+
+rsync -avz --delete /soft/tomcat/ 10.0.0.8:/soft/tomcat/
+
