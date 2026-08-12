@@ -1,0 +1,358 @@
+精简笔记:
+#四表五链 不用: mangle raw
+Filter {
+	OUTPUT
+	INPUT
+	FORWARD
+}
+
+NAT {
+	OUTPUT
+	PRErouting
+	POSTrouting
+}
+
+#添加模块
+lsmod #看内核里的模块
+cat >>/etc/rc.local<<EOF
+modprobe ip_tables
+modprobe iptable_filter
+modprobe iptable_nat
+modprobe ip_conntrack
+modprobe ip_conntrack_ftp
+modprobe ip_nat_ftp
+modprobe ipt_state
+EOF
+
+#删除规则
+iptables -D INPUT 2 #删除INPUT当中的第二个序号的规则
+iptables -F #flush #清空所有规则，除了默认
+iptables -X #删除用户自定义链，通常不会自定义链
+iptables -Z #计数器清零
+
+#白名单=部分允许+全面禁止
+iptables -I INPUT -s 10.0.0.1 -j ACCEPT
+
+#禁止一个网段
+iptables -I INPUT -s 10.0.0.0/24 -j DROP
+
+#面试: 禁止某个IP地址怎么写?
+iptables -A INPUT -s 地址 -j DROP
+
+#!取反，慎重使用
+iptables -I INPUT ! -s 10.0.0.7 -p tcp --dport 888 -j DROP
+
+#配置多个端口
+iptables -I INPUT -p tcp -m multiport --dport 80:100 -j ACCEPT
+
+NAT共享上网
+#公网ip确定时
+iptable -t nat -A POSTROUTING -s 172.16.1.0/24 -j SNAT --to-soure 10.0.0.61
+#公网ip不确定时 MASQUERADE（地址伪装） 
+iptables -t nat -A POSTROUTING -s 172.16.1.0/24 -j MASQUERADE
+
+DNAT做跳板机
+iptables -t nat -A PREROUTING -d 10.0.0.61 -p tcp --dport 9000 -j DNAT --to-destination 172.16.1.7:22
+
+
+
+
+
+
+
+
+
+
+
+
+
+##########################复杂完整笔记##########################
+
+
+
+
+
+防火墙软件和硬件区别 ~ 人工检票和机器检票的区别
+
+---------- 现实里的选用场景 ----------
+
+一般互联网公司用软件防火墙就行。
+少部分大流量公司才用硬件的防火墙。
+ZOL找
+
+
+---------- NetFilter ----------
+
+NetFilter {
+	table表01 {
+		chain链 [policy规则01, policy规则02, policy规则03],
+		chain链 [policy规则01, policy规则02, policy规则03],
+		chain链 [policy规则01, policy规则02, policy规则03],
+	}
+
+	table表02 {
+		chain链 [policy规则01, policy规则02, policy规则03],
+		chain链 [policy规则01, policy规则02, policy规则03],
+		chain链 [policy规则01, policy规则02, policy规则03],
+	}
+
+	table表03 {
+		chain链 [policy规则01, policy规则02, policy规则03],
+		chain链 [policy规则01, policy规则02, policy规则03],
+		chain链 [policy规则01, policy规则02, policy规则03]
+	}
+}
+
+先抓取，再限制。
+用户层：应用层  和  内核层：TCP/UDP 网络层‘钩子’ 网络接口层
+
+网络层 有钩子判断是否允许进出 Netfilter就在网络层
+Netfilter 四表: Filter NAT Mangle rule
+Filter 进出流量，进出身份
+Nat 端口映射，路由器功能，把内网转换成公网访问
+Mangle 改首部信息，不常用。
+raw 没用，取经路上的沙僧，纯多余。
+
+1，四表: 其实只用 Filter 和 NAT
+2，路线: 网络层->NetFilter->Filter/NAT
+3，NAT条件: 双网卡
+4，双网卡路由: 路由判决
+5，三种流量 三个钩子 截获流量: INPUT进来的, OUTPUT出去的, NAT经过的
+6，出口不唯一时(电信+联通)，这种复杂情况下，OUTPUT控制就有用了。
+
+---------- 面试:四表五链 ----------
+
+Filter {
+	OUTPUT
+	INPUT
+	FORWARD
+}
+
+NAT {
+	OUTPUT
+	PRErouting
+	POSTrouting
+}
+
+mangle { [NAT],[Filter] }
+raw {}
+
+---------- 从企业的常用分析 ----------
+
+filter表
+nat表
+SNAT: 局域网IP->NAT->公网IP
+
+input链
+
+pre-routing链
+改变目标，负载均衡，来的流量
+DNAT: 外网->DNAT->局域网IP
+LVS
+
+post-routing链
+改变源，局域网共享上网，出的流量
+
+---------- install iptables-services ----------
+
+/etc/sysconfig/iptables
+/usr/lib/systemd/system/iptables.service
+
+#防火墙相关模块 加载到内核中 profile rc.local
+#cat >> 追加; cat > 覆盖;
+cat >>/etc/rc.local<<EOF
+modprobe ip_tables
+modprobe iptable_filter
+modprobe iptable_nat
+modprobe ip_conntrack
+modprobe ip_conntrack_ftp
+modprobe ip_nat_ftp
+modprobe ipt_state
+EOF
+
+lsmod #看内核里的模块
+iptables -nL #自上而下的匹配规则，最后是默认规则
+
+iptables -t filter -I INPUT -p tcp --dport 22 -j DROP #-t指定表 默认filter -I插入 -A追加 -p 协议 --dport 目标端口 -j 动作
+iptables -t filter -I INPUT -s 116.233.12.34 -j DROP #-s来源ip地址
+
+-m 多端口multiport
+-i 指定进来网卡input
+-o 指定出去网卡output
+-j #DROP ACCEPT REJECT
+
+iptables -F #flush #清空所有规则，除了默认
+iptables -X #删除用户自定义链，通常不会自定义链
+iptables -Z #计数器清零
+
+---------- iptables案例 ----------
+
+1，禁止访问22端口
+iptables -t filter -I INPUT -p tcp --dport 22 -j DROP
+iptables -I INPUT -p tcp --dport 22 -j DROP
+
+2，删除规则
+
+#白名单让规则失效:
+iptables -I INPUT -s 10.0.0.1 -j ACCEPT #添加白名单
+
+序号删除:
+iptalbes -nL --line #查看行号
+iptables -D INPUT 2 #删除INPUT当中的第二个序号的规则
+
+-D删除:
+iptables -A INPUT -p tcp --dport 22 -j DROP #追加这一条
+iptables -D INPUT -p tcp --dport 22 -j DROP #删除这一条
+
+3，限制来源ip地址
+禁止10.0.0.3
+iptables -F
+iptables -nL
+iptables -I INPUT -s 10.0.0.0/24 -j DROP #丢掉这些IP的流量的来源
+
+4，限制网段
+iptables -I INPUT -s 172.16.1.7/24 -j DROP
+iptables -nL
+
+5，禁止端口
+iptables -t filter -I INPUT -p tcp --dport 8080 -j DROP
+iptables -t filter -D INPUT -p tcp --dport 8080 -j DROP
+
+---------- 面试:iptables ----------
+
+禁止某个IP地址怎么写?
+iptables -A INPUT -s 地址 -j DROP
+
+---------- 模拟端口 ----------
+
+nc -kl 8888 启动端口
+curl -I 访问
+ssh ip 8888
+telnet IP 8888
+
+6，限制来源ip能请求到的端口
+iptables -t filter -I INPUT -s 10.0.0.7 -p tcp --dport 8888 -j DROP
+
+7，!取反，慎重使用
+iptables -I INPUT ! -s 10.0.0.7 -p tcp --dport 888 -j DROP
+因为默认是允许，所以大部分都是在-j配置DROP拒绝
+因为-t默认是filter，所以大部分是在-t配置NAT
+其他谨慎:
+rsync --delete
+rm
+
+9，修改默认规则
+  - 允许自己通过访问。
+  - 指定INPUT默认为DROP
+  iptables -I INPUT -s 10.0.0.1 -j ACCEPT
+  - 修改默认规则为DROP
+  iptables -nL
+  iptables -P INPUT DROP
+  iptalbes -I INPUT -p tcp --dport 80 -j ACCEPT
+  iptables -I INPUT -p tcp --dport 443 -j ACCEPT
+
+10，指定多端口
+  -m multiport #指定多端口模块
+  #80和443
+  iptables -I INPUT -p tcp -m multiport --dport 80,443 -j ACCEPT
+  #80到100
+  iptables -I INPUT -p tcp -m multiport --dport 80:100 -j ACCEPT
+
+11，没保存，都是临时的
+  - iptables-save 写到配置文件当中
+  - rpm -ql iptables #可以看这个包的文件，找配置文件很方便
+  - cat /etc/sysconfig/iptables
+
+12，iptables禁止icmp
+  - iptables -I INPUT -p icmp --icmp-type 8 -j DROP
+  - iptables -D INPUT -p icmp --icmp-tpye 8 -j DROP
+  - tracert -d 10.0.0.61 #测试，路由器经常做。防止icmp攻击。
+
+13，Linux内核禁止icmp
+  echo 1 >/proc/sys/net/ipv4/icmp_echo_ignore_all
+
+14，网络11种网络状态 TCP/IP连接状态
+-m state -sate
+
+NEW 新
+ESTABLISHED 已建立
+RELATED 正在启动
+INVALID 非法
+
+iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+
+---------- 防火墙规则保存和恢复 ----------
+
+#查看
+cat /etc/sysconfig/iptables
+
+#覆盖/etc/sysconfig/iptables
+iptables-save
+
+#清空
+iptables -F
+
+#重启恢复
+systemctl restart iptables
+
+#导入恢复
+iptables-restore < /etc/sysconfig/iptables
+
+默认DROP 看电影模式
+默认ACCEPT 逛公园模式
+
+#允许本机lo
+iptables -A INPUT -i lo -j ACCEPT
+iptables -A OUTPUT -o lo -j ACCEPT
+
+#公司里基本这样
+-A INPUT -p tcp -m tcp -- dport 22 -j ACCEPT
+-A INPUT -i lo -j ACCEPT
+-A INPUT -p tcp -m multiport -- dports 443,80,10050 -j ACCEPT
+-A INPUT -s 10.0.0.0/24 -j ACCEPT
+-A INPUT -s 172.16.1.0/24 -j ACCEPT
+-A OUTPUT -o lo -j ACCEPT
+
+
+
+
+---------- NAT ----------
+
+共享上网，从当路由器。
+两个网卡，一个公网一个内网。
+SNAT源地址转换。
+
+---------- NAT共享上网 ----------
+
+充当路由: 10.0.0.61 172.16.1.61
+客户端A: 172.16.1.7  网关: 172.16.1.61
+客户端B: 172.16.1.8  网关: 172.16.1.61
+A和B全部转换成10.0.0.61，叠一层马甲。
+iptable -t nat -A POSTROUTING -s 172.16.1.0/24 -j SNAT --to-soure 10.0.0.61
+#记得启动流量转发
+echo 'net.ipv4.ip_forward = 1' >> /etc/sysctl.conf
+sysctl -p
+#MASQUERADE（地址伪装） 公网ip不确定时
+iptables -t nat -A POSTROUTING -s 172.16.1.0/24 -j MASQUERADE
+
+---------- DNAT地址映射 ----------
+用DNAT做公网跳转，做跳板机。
+iptables -t nat -A PREROUTING -d 10.0.0.61 -p tcp --dport 9000 -j DNAT --to-destination 172.16.1.7:22
+
+iptables < routeOS < 路由器
+网吧常用routeOS
+
+#查看
+iptables -nL -t nat
+
+---------- 防止syn ddos ping攻击 ----------
+
+#每秒中最多允许5个新连接
+-A FORWARD -p tcp -- syn -m limit -- limit 1/s -- limit-burst 5 -j ACCEPT
+#防端口扫描
+-A FORWARD -p tcp -- tcp-flags SYN,ACK,FIN,RST RST -m limit -- limit 1/s -j ACCEPT
+#Ping洪水攻击
+A FORWARD -p icmp -- icmp-type echo-request -m limit -- limit 1/s -j ACCEPT
