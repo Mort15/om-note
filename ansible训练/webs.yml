@@ -1,0 +1,20 @@
+---
+- hosts: webs
+  vars_files:
+    - var_web.yml
+  name: create user and file
+  tasks:
+  - name: Create User suckmydick
+    user:
+      name: "{{ suckmydick }}"
+      comment: "{{ suckmydick }}"
+      uid: 6607
+
+  - name: Change file ownership, group and permissions
+    file:
+      path: "/etc/{{ suckmydick }}.conf"
+      owner: "{{ suckmydick }}"
+      group: "{{ suckmydick }}"
+      mode: '0644'
+      state: touch 
+

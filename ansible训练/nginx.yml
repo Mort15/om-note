@@ -1,0 +1,59 @@
+---
+- hosts: webs
+  name: install nginx
+  tasks:
+  - name: create group www
+    group:
+      name: www
+      state: present
+
+  - name: create user www
+    user:
+      name: www
+      uid: 666
+      group: www
+      shell: /sbin/nologin
+
+  - name: yum install nginx -y
+    yum:
+      name: nginx
+      state: present
+
+  - name: configure nginx
+    copy:
+      src: nginx.conf
+      dest: /etc/nginx/nginx.conf
+      owner: nginx
+      group: nginx
+      mode: '0644'
+    notify:
+      - nginx -t 
+      - print debug nginx_vars
+      - restart nginx
+
+  - name: start nginx 
+    systemd:
+      state: started
+      name: nginx
+      enabled: yes
+
+  - name: stop firewalld
+    systemd:
+      name: firewalld
+      state: stopped
+
+  handlers:
+  - name: nginx -t
+    shell: nginx -t
+    register: nginx_vars
+    ignore_errors: yes
+    
+  - name: print debug nginx_vars
+    debug:
+      var: nginx_vars
+  
+  - name: restart nginx
+    systemd:
+      name: nginx
+      state: reloaded
+    when: nginx_vars.stderr is match "susses"

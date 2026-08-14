@@ -1,0 +1,22 @@
+---
+- hosts: webs
+  tasks:
+  - name: create file use ip
+    copy:
+      content: "IPis{{ ansible_all_ipv4_addresses[0] }}"
+      dest: "/opt/{{ ansible_all_ipv4_addresses[0] }}"
+
+  - name: list和str冲突 
+    vars:
+      a: 'aaaa'
+      b: /opt/bbb
+      webapps:
+        - app1
+        - app2
+        - app3
+    copy:
+      content: "{{ a }}"
+      #dest: "{{ b }}"
+      dest: "/opt/{{ item }}"
+    loop: "{{ webapps }}"
+

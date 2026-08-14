@@ -1,0 +1,11 @@
+---
+- name: Test Cron
+  hosts: webs
+  tasks:
+  - name: "0 5,2 * * ls -alh > /dev/null"
+    cron:
+      name: "check dirs"
+      minute: "0"
+      hour: "5,2"
+      job: "ntpdate ntp1.aliyun.com &> /dev/null"
+      state: "absent"

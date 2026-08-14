@@ -1,3 +1,51 @@
+#限制SSH连接频率
+iptables -I INPUT -p tcp --dport 22 -m state --state NEW -m recent --set
+iptables -I INPUT -p tcp --dport 22 -m state --state NEW -m recent --update --seconds 60 --hitcount 3 -j DROP
+1, -m recent --set      记录set  来源的小本本
+2, -m recent --update   找update  小本本里有没有记录过
+3, --seconds 60 --hitcount 3 -j DROP 设定条件: "记考勤，60秒内旷工3次的直接开除。"
+
+#NAT上网
+echo 1 > /proc/sys/net/ipv4/ip_forward
+iptables -t nat -A POSTROUTING -s 192.168.1.0/24 -o eth0 -j MASQUERADE
+iptables -t nat -A POSTROUTING -s 192.168.1.0/24 -o eth0 -j SNAT --to-source 12.34.56.78
+1, 公网ip不固定时: MASQUERADE   #因为要查路由表，速度会慢一点
+2, 公网ip固定时: -j SNAT --to-source 12.34.56.78
+
+#端口转发
+iptables -t nat -A PREROUTING -p tcp --dport 9090 -j DNAT --to-destination 192.168.1.100:80
+iptables -A FORWARD -p tcp -d 192.168.1.100 --dport 80 -j ACCEPT
+# 篡改快递单上的收货地址-j DNAT --to-destination 192.168.1.100:80 
+
+改变目标 PREROUTING DNAT 公网冒充内网IP进来，端口映射，
+改变来源 POSTROUTING SNAT 内网冒充公网IP出去，上网刷视频，是家常便饭
+
+
+#允许已建立连接
+iptables -I INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+#日志记录 可以记录原本被DROP的包
+iptables -I INPUT -j LOG --log-prefix "FW-DROP: " --log-level 4
+
+扩展模块: -m recent -m state
+可选项: -j LOG
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 第一模块_增删改查:
   题1:
     需求: "在 INPUT 链尾部追加一条规则，放行所有 IP 访问本机的 TCP 80 端口。"
@@ -169,4 +217,140 @@
     需求: "公网 IP 2.2.2.2 的 80 端口映射到内网 10.0.0.3 的 8080 端口。写出 DNAT 命令。"
   题25:
     需求: "做完 DNAT 后，外网访问正常，但内网其他机器无法通过公网 IP 访问。请补一条规则（POSTROUTING 链做 SNAT）解决此问题。"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+通过下面的题, 整理自己不熟的: 
+#限制SSH连接频率
+iptables -I INPUT -p tcp --dport 22 -m state --state NEW -m recent --set
+iptables -I INPUT -p tcp --dport 22 -m state --state NEW -m recent --update --seconds 60 --hitcount 3 -j DROP
+
+#NAT上网
+echo 1 > /proc/sys/net/ipv4/ip_forward
+iptables -t nat -A POSTROUTING -s 192.168.1.0/24 -o eth0 -j MASQUERADE
+
+#端口转发
+iptables -t nat -A PREROUTING -p tcp --dport 9090 -j DNAT --to-destination 192.168.1.100:80
+iptables -A FORWARD -p tcp -d 192.168.1.100 --dport 80 -j ACCEPT
+
+#允许已建立连接
+iptables -I INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+#日志记录
+iptables -I INPUT -j LOG --log-prefix "FW-DROP: " --log-level 4
+
+ai出题20道，简单做了一下，可能有错误的没改。:
+
+1. 查看当前所有 iptables 规则，带行号，不解析 IP 和端口。
+root@PRACTICE:~# iptables -nL
+
+2. 清空 filter 表里所有规则。
+root@PRACTICE:~# iptables -t filter -F
+
+3. 删除 INPUT 链上的第 5 条规则。
+root@PRACTICE:~# iptables -t filter -D INPUT 5
+
+4. 允许所有 IP 访问本机的 SSH（22 端口）。
+root@PRACTICE:~# iptables -t filter -n -L INPUT
+
+5. 只允许 IP 10.0.0.88 访问本机 22 端口，其他全部拒绝。
+root@PRACTICE:~# iptables -t filter -I INPUT -p tcp -s 10.0.0.88 --dport 22 -j ACCEPT
+root@PRACTICE:~# iptables -t filter -A INPUT -p tcp --dport 22 -j DROP
+
+6. 封禁 IP 203.0.113.45 访问本机任何端口。
+root@PRACTICE:~# iptables -t filter -I INPUT -s 203.0.113.45 -j DROP
+
+7. 封禁 IP 203.0.113.45 访问本机的 80 端口。
+root@PRACTICE:~# iptables -t filter -I INPUT -p tcp -s 203.0.113.45 --dport 80 -j DROP
+
+8. 封禁整个网段 172.16.0.0/16 访问本机的 443 端口。
+root@PRACTICE:~# iptables -t filter -I INPUT -p tcp -s 172.16.0.0/16 --dport 443 -j DROP
+
+9. 只允许内网 10.0.0.0/8 访问本机所有服务，其他全部拒绝。
+root@PRACTICE:~# iptables -t filter -I INPUT -s 10.0.0.0/8 -j ACCEPT
+root@PRACTICE:~# iptables -t filter -A INPUT -j DROP
+
+10. 禁止外网 ping 本机，但本机可以正常 ping 外网。
+root@PRACTICE:~# iptables -t filter -I INPUT ! -s 127.0.0.1 -p icmp -j DROP
+#或者
+root@PRACTICE:~# iptables -I INPUT -p icmp -j DROP
+
+11. 限制 SSH 每分钟最多建立 3 个新连接，超过则丢包（防暴力破解）。
+
+略
+--limit avg
+--limit-burst number
+
+12. 用 NAT 让内网 192.168.1.0/24 通过网卡 eth0 上网。
+略
+
+
+13. 将外部访问本机 9090 端口的流量，转发到内网 192.168.1.100 的 80 端口。
+略
+
+
+14. 允许所有已建立连接（ESTABLISHED）和关联连接（RELATED）的数据包通过。
+略
+
+
+15. 禁止本机访问外网 IP 8.8.8.8（模拟禁止访问某特定服务器）。
+略
+
+
+16. 禁止本机所有 DNS 查询（封 UDP 53 出站）。
+root@PRACTICE:~# iptables -t filter -I OUTPUT -p udp --dport 53 -j DROP
+
+17. 将所有被 DROP 的包记录到系统日志，日志前缀为 "FW-DROP: "。
+略
+
+18. 允许本机 loopback（lo）接口的所有通信。
+root@PRACTICE:~# iptables -I INPUT -i lo -j ACCEPT
+root@PRACTICE:~# iptables -I OUTPUT -o lo -j ACCEPT
+
+19. 设置默认策略：INPUT 和 FORWARD 全部拒绝，OUTPUT 全部允许。
+# 读help知道的  root@PRACTICE:~# iptables -h | grep -i '\-p'
+#       iptables -P chain target [options]
+root@PRACTICE:~# iptables -P INPUT DROP
+root@PRACTICE:~# iptables -P FORWARD DROP
+root@PRACTICE:~# iptables -P OUTPUT ACCEPT
+
+20. 将当前所有规则保存到配置文件，要求重启后依然生效（分别写出 Debian/Ubuntu 和 CentOS/RHEL 的命令）。
+iptables-save
+
+
+
+
+
+
+
+
+
 

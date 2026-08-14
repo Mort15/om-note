@@ -1,0 +1,31 @@
+#限制SSH连接频率
+iptables -I INPUT -p tcp --dport 22 -m state --state NEW -m recent --set
+iptables -I INPUT -p tcp --dport 22 -m state --state NEW -m recent --update --seconds 60 --hitcount 3 -j DROP
+1, -m recent --set      记录set  来源的小本本
+2, -m recent --update   找update  小本本里有没有记录过
+3, --seconds 60 --hitcount 3 -j DROP 设定条件: "记考勤，60秒内旷工3次的直接开除。"
+
+#NAT上网
+echo 1 > /proc/sys/net/ipv4/ip_forward
+iptables -t nat -A POSTROUTING -s 192.168.1.0/24 -o eth0 -j MASQUERADE
+iptables -t nat -A POSTROUTING -s 192.168.1.0/24 -o eth0 -j SNAT --to-source 12.34.56.78
+1, 公网ip不固定时: MASQUERADE   #因为要查路由表，速度会慢一点
+2, 公网ip固定时: -j SNAT --to-source 12.34.56.78
+
+#端口转发
+iptables -t nat -A PREROUTING -p tcp --dport 9090 -j DNAT --to-destination 192.168.1.100:80
+iptables -A FORWARD -p tcp -d 192.168.1.100 --dport 80 -j ACCEPT
+# 篡改快递单上的收货地址-j DNAT --to-destination 192.168.1.100:80 
+
+改变目标 PREROUTING DNAT 公网冒充内网IP进来，端口映射，
+改变来源 POSTROUTING SNAT 内网冒充公网IP出去，上网刷视频，是家常便饭
+
+
+#允许已建立连接
+iptables -I INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+#日志记录 可以记录原本被DROP的包
+iptables -I INPUT -j LOG --log-prefix "FW-DROP: " --log-level 4
+
+扩展模块: -m recent -m state
+可选项: -j LOG
