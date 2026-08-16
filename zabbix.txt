@@ -1,0 +1,22 @@
+zabbix.txt
+
+1, UserParameter
+2, zabbix_get -s 172.16.1.7 -k login_user
+3, S_10051 C_10050
+
+zabbix端口
+10051服务端
+10050客户端
+----------- UserParameter -----------
+vim /etc/zabbix/zabbix_agent.conf
+inlucde=./zabbix_agentd.d/*.conf
+
+vim ./zabbix_agentd.d/os.conf
+UserParameter=login_user,w|awk 'NR=1{print $5}'
+定义login_user变量，赋值$(w|awk 'NR=1{print $5}')
+加上之后重启zabbix，并且列出内部值
+zabbix_agentd -t | grep login_user
+
+yum install zabbix-get -y #调用值用的工具，安装时-，使用时_。 在服务端获取监控值。
+zabbix_get -s 172.16.1.7 -k login_user
+重启zabbix服务会重新全部拉取一次新的值
