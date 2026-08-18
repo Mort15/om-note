@@ -1,0 +1,27 @@
+💵0 文件名
+💵1 传参第一
+💵_ 传参最后
+💵？ 取上一个命令结果0正确
+💵# 传参个数
+💵@ 所有参数，引用时逐个
+💵* 所有参数，引用时全部
+💵💵 当前pid
+💵！ 上次pid
+[  ] 可以搭配and取代if
+防止识别错误，可以给变量加{}扩住
+两类变量写法：大驼峰小驼峰，全大写全小写
+basename 取最后一个参数
+ps auxf要有父子bash意识
+面试题: shell能做什么
+
+面试题:
+自动安装操作系统kickstart cobbler
+优化操作系统
+系统层面: selinux 优化ssh 文件描述符 默认仓库 定时任务 内核参数优化
+安全层面: 禁用root jumpserver iptables名单 禁止操作系统版本号
+安装服务: nginx nfs rsync tomcat httpd jumpserver zabbix php 
+部署代码 代码更新
+服务监控 zabbix 自定义监控
+日志分析 ip访问量 日志切割 ELK
+其他: 定时任务+shell脚本
+
