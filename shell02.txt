@@ -1,0 +1,139 @@
+shell02.txt
+
+笔试题写的越多越好，炫技有概率加钱。
+
+----- 切片处理字符串 -----
+echo awk切片处理字符串:
+echo $name | awk '{print $(NF-1),$NF}'
+echo ${name:2} #切除前两个字符
+echo ${name:2:2} #只保留从第二个开始，往后数两个
+工作中awk用的最多。
+
+
+----- 统计字符串长度 -----
+wc $# expr awk:
+echo $name | wc -L
+echo ${#name}
+expr length "$name"
+echo $name|awk '{print length $0}'
+shell当中$0是名字，awk当中$0是全部内容
+
+echo $name|xargs -n1|awk '{print}'
+#判断每行的长度， 长度小于3， 打印出来。
+echo $name|xargs -n1|awk '{if(length<3)print}'
+
+----- for 循环 -----
+for i in I am AAA
+do 
+  echo $i
+  echo ${#i}
+  echo [ ${#i} -lt 3 ] 
+done
+
+lt Less Than小于    ${#i}取长度
+sh -x a.sh #调试
+echo $name|awk '{for(i=1;i<=NF;i++)if(length($i)<3)print $1}'
+
+删除:
+#从前往后匹配，删掉前面
+##贪婪匹配
+%从后往前匹配，删掉后面
+%%贪婪匹配
+BaiduUrl=www.baidu.com
+echo ${BaiduUrl#baidu}   剩下.com
+echo ${BaiduUrl#*.*.}    剩下com
+echo ${BaiduUrl%.com}    剩下www.baidu
+这里特殊字符#和%都可以搭配\转译
+比如 df -h 取值时，一些值携带%
+
+替换:
+/仅仅替换第一个
+//是全局替换
+echo ${BaiduUrl/baidu/aliyun}   输出www.aliyun.com  更换一个
+echo ${BaiduUrl//w/W}           输出WWW.baidu.com   更换全局
+echo ${BaiduUrl/baidu/}         输出www..com        等同删除
+
+运算:
+expr 1+1         输出1+1字符串
+expr 1 + 1       输出运算结果2
+expr 10 - 2      输出运算结果8
+expr 10 / 2      输出运算结果5
+expr 2 * 10      输出失败，星号被解析成其他含义
+expr 2 \* 10     输出运算结果20
+1, 运算之间需要加空格
+2, 乘号需要转译再用
+3, expr特性 字符串可以加字符串, 而字符串加数字会报错。
+利用这个特性编写脚本,要求判断传入的参数是否为数字整数:
+第一遍发现问题:
+1, 不知道read -p这个参数是大写还是小写
+2, 不知道-ne
+3, 不知道&>/dev/null
+#/bin/bash
+read -p "Input Your Age:" age
+read -p "Input Your Name:" name
+expr $age + 1 &>/dev/null
+[ $? -ne 0 ] && echo "input really age" && exit
+echo "Age: $age"
+echo "name: $name"
+
+比expr更好的方式 $(()) $[] 
+echo $((1+1-1*10-39/2))
+echo $[1+1-1*10-39/2]
+
+自加运算
+let i++
+
+比expr $(()) $[] let更好的方式 bc
+弥补了没有小数点的遗憾。
+echo 10 \* 10.5|bc
+echo 10 - 10.5|bc
+
+无需多言 awk python
+awk 'BEGIN{print 10+10}'
+echo|awk '{print 10+10}'
+
+使用exit指定返回值(1-255)
+
+linux内嵌命令test: 当 test 判断表达式成立时，退出状态为 0，否则为非 0 值
+条件表达式[]
+-e 判断文件
+-f 判断普通文件
+-d 判断目录文件
+-r -w -x判断目标对应权限
+! 搭配取反，检测反效果
+前面成立&&执行后面
+前面不成立||执行后面
+组完美配合: [ -f /etc/hosts -a -d /etc ] && echo 成立 || echo 不成立
+
+-a 并且
+-o 或者
+
+字符串对比:
+#[ "root" = "$SHELL"  ] && echo 成立 || echo 不成立
+
+-z 变量为空成立。字符串长度0。
+-n 变量不为空成立。字符串长度不为0。
+
+根据我们的毕生所学 sed [] -z expr 判断输入参数
+#!/bin/bash
+read -p "输入你的姓名: " name
+name_test=$(echo $name | sed -r 's#[^0-9]##g' | wc -L)
+[ $name_test -ne 0 ] && echo "你的名字里怎么还有编号?" && exit
+[ -z $name ] && echo "你没有名字?" && exit
+read -p "输入你的年龄: " age
+expr $age + 1 &>/dev/null
+[ $? -ne 0 ] && echo "请用阿拉伯数字。" && exit
+echo "name: ${name}"
+echo "age: ${age}"
+
+更牛逼的对比 [[  ]] 正则版本的[]  相当于 sed -r  grep -E
+[[ root =~ ^r ]] && echo 成立 || echo 不成立
+
+g大 t比 eq等 l小 n不
+-eq =
+-ne !=
+-gt >
+-ge >=
+-lt <
+-le <=
+
