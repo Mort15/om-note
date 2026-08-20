@@ -1,0 +1,218 @@
+[ 10 -eq 10 ] && echo 成立
+#if和then写同一行用;
+if [  ];then
+fi
+#if和then不写同一行用\n
+if [  ]
+then
+fi
+#加上else
+if [  ];then
+else
+fi
+#else+if=elif
+if [  ];then
+elif [  ];then
+fi
+#1, echo+if做菜单
+#2, 因为执行后会出来，所以用while包裹起来，完美循环。
+-------------------------------------
+#!/bin/bash
+while true
+do
+  echo -e "\t\t\t1.精子粥"
+  echo -e "\t\t\t2.臭鸡炸炸炸"
+  echo -e "\t\t\t3.香炉管"
+  echo -e "\t\t\t4.烤几把"
+  echo -e "\t\t\t5.美味炸鸡巴"
+  echo -e "\t\t\t6.孜然鸦片"
+  echo -e "\t\t\t7.手烤鸡鸡"
+  echo -e "\t\t\t8.抓冷蛋蛋"
+  echo -e "\t\t\t9.饼面饼饼"
+
+read -p "你想要什么?" num
+expr $num + 0
+[ $? -ne 0 ] && echo "没有这个。" && exit
+
+if [ $num -eq 1 ];then
+  echo -e "给你个打击吧。"
+elif [ $num -le 5 ];then
+  echo -e "给你个消极把！" 
+elif [ $num -gt 5 ];then
+  echo -e "你没有叽霸！"
+fi
+
+done
+-------------------------------------
+#!/bin/bash
+os_ver=$(awk '{print $4}' /etc/redhat-release)
+os_release=$(cat /etc/redhat-release)
+backup_yum='mv /etc/yum.repos.d/Centos-Base.repo /etc/yum.repos.d/Centos-Base.repo.backup'
+which wget &>/dev/null
+if [ $? -ne 0 ];then
+  echo "install...."
+  yum -y install wget &>/dev/null
+  if [ $? -eq 0 ];then
+    echo "ok"
+  else [ $? -eq 0 ]
+    echo "no!!  install wget no"
+    exit
+  fi
+
+fi
+
+echo $os_release|grep CentOS
+if [[ $? ]];then
+  [ -e /etc/yum/repos.d/Centos-Base.repo] && $backup_yum
+  [ -e /etc/yum.repos.d/ ] && wget -O /etc/yum.repos.d/Centos-Base.repo https://mirrors.aliyun.com/repo/Centos-${os_ver%%.*}.repo
+fi
+-------------------------------------
+[root🥒ansible ~]# vim d.sh #猜大小
+  1 #!/bin/bash
+  2 rand_num=$(echo $((RANDOM)))
+  3 
+  4 while true
+  5 do
+  6   let i++
+  7   read -p "输入你猜的数字: " num
+  8   if [ $num -gt $rand_num ];then
+  9     echo "大了。"
+ 10   elif [ $num -lt $rand_num ];then
+ 11     echo "小了。"
+ 12   elif [ $num -eq $rand_num ];then
+ 13     echo "牛逼可以的。"
+ 14     echo "一共猜了${i}次"
+ 15     exit #也可以用break
+ 16   fi
+ 17 done
+-------------------------------------
+[root🥒ansible ~]# cat e.sh #case菜单
+#!/bin/bash
+case $1 in
+  shell)
+    echo shell...
+  ;;
+  mysql)
+    echo mysql...
+  ;;
+  docker)
+    echo docker..
+  ;;
+  *)
+    echo "Select: $0 [shell|mysql|docker]"
+esac
+-------------------------------------
+[root🥒ansible ~]# cat f.sh  #引入函数的概念
+#!/bin/bash
+show(){
+echo -e "\t\t\t\t 1.磁盘利用率"
+echo -e "\t\t\t\t 2.CPU利用率"
+echo -e "\t\t\t\t 3.MEM利用率"
+echo -e "\t\t\t\t 4.IP"
+echo -e "\t\t\t\t 5.登录用户数"
+echo -e "\t\t\t\t 6.退出"
+}
+show
+while true
+do
+read -p "SELECT: " num
+case $num in
+  a|A|1)
+    df -h
+    ;;
+  b|B|2)
+    uptime
+    ;;
+  c|C|3)
+    free -h
+    ;;
+  d|D|4)
+    ip a
+    ;;
+  e|E|5)
+    w
+    ;;
+  f|F|6)
+    exit
+    ;;
+  *)
+    show
+    ;;
+esac
+done
+-------------------------------------
+if [ $num = 1 -o $num = h ] #可以用-o无限叠加，字符串用等号，数字用-eq
+-------------------------------------
+[root🥒ansible ~]# cat g.sh #到工作的时候，差不多也是这样的脚本，很简单，能解决问题就行了。
+#!/bin/bash
+show(){
+echo -e "/t/t/t/t Start Nginx"
+echo -e "/t/t/t/t Stop Nginx"
+echo -e "/t/t/t/t restart Nginx"
+}
+case $1 in
+  start)
+    /usr/sbin/nginx
+  ;;
+  stop)
+    /usr/sbin/nginx -s stop
+  ;;
+  restart)
+    /usr/sbin/nginx -s stop
+    sleep 2
+    /usr/sbin/nginx
+  ;;
+  status)
+    ps -aux|grep -v grep|grep nginx|awk '{print $1,"PID: "$2}' 
+  ;;
+  *)
+    echo "Usage: $0 start|stop|restart"
+  ;;
+esac
+-------------------------------------
+出现两次以上的要用变量替换。
+show(){  } #调用函数时, 不用加括号
+-------------------------------------
+  1 #!/bin/bash
+  2 ping -c1 -W1 $1 &>/dev/null
+  3 if [ $? -eq 0 ];then
+  4  echo "$1 ping OK"
+  5 else
+  6  echo "$1 ping ERROR"
+  7 fi
+通过系统自带函数，改成十分吊逼的UI效果
+/etc/init.d/functions -> /etc/rc.d/init.d/functions
+
+[root🥒ansible ~]# cat h.sh 
+#!/bin/bash
+[ -f /etc/init.d/functions ] && . /etc/init.d/functions
+
+ping -c1 -W1 $1 &>/dev/null
+if [ $? -eq 0 ];then
+ #echo "$1 ping OK"
+ action "$1 ping" /bin/true
+else
+ #echo "$1 ping ERROR"
+ action "$1 ping" /bin/false
+fi
+-------------------------------------
+i=0
+while true
+do
+let i++
+if [ $i -eq 3 ];then
+  echo "错误太多，锁定60"
+  sleep 60
+  unset i
+done
+read -s -p "输入密码: " pass
+if [ $pass = "123" ];then
+  break
+else
+  echo "密码错误"
+fi
+-------------------------------------
+jumpserver
+1, 禁掉ctrl+c   trap "echo 禁止ctrl+c" INT TSTP HUP
+2, 开机自启,登录自启     sh /root/jumpserver.sh写进/etc/profile
+3, 需要给自己留后门
