@@ -1,0 +1,27 @@
+keepalived回忆笔记
+1，脑裂：Master和Slave不能互相通信时，但是正常存活，两者都以为自己是老大。相互抢IP的行为叫做脑裂。
+2，脑裂的原因：一般是防火墙，也可能是任何网络故障，如老鼠咬网线，设备老化。
+3，脑裂后怎么做：先关掉一台，这时候业务临时正常。随后去排查原因。
+4，怎么预防脑裂：上云平台，肯定不会脑裂；去写shell脚本
+5，nginx问题：捆绑nginx和keepalived。
+6，现在用keepalived的公司少了，因为云平台支持，面试都不问了甚至。
+写脚本
+7，LVS用的更少。只有超大公司才用，小公司keepalived+nginx足以。
+#!/bin/sh
+# 1,获取 nginx 状态
+# 2,判断状态
+# 3,把nginx杀干净
+# 4,重启nginx
+# 5,重启失败的话，关掉keepalived
+nginx_num = $(ps -aux | grep nginx | grep -v nginx | wc -l) 
+if [ $nginx_num -eq 0 ];then
+	pkill -9 nginx
+	systemctl restart nginx
+	if [ $? -eq 0 ];then
+		systemctl stop keepalived
+	fi
+fi
+把脚本放进/etc/keepalived/keepalived.conf当中
+yum install -y keepalived
+
+#####################################################

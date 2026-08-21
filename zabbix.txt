@@ -20,3 +20,82 @@ zabbix_agentd -t | grep login_user
 yum install zabbix-get -y #调用值用的工具，安装时-，使用时_。 在服务端获取监控值。
 zabbix_get -s 172.16.1.7 -k login_user
 重启zabbix服务会重新全部拉取一次新的值
+
+
+
+
+
+
+
+
+
+
+UserParameter=
+zabbix_get -s 127.0.0.1 -k nginx.[active]
+mysql -uroot -e 'show global status';
+
+我感觉这些东西不能只听课
+这种课信息密度也太低了
+并且图形化很难写笔记
+可以接入邮件和微信
+
+----- 远程执行命令 -----
+动作里可以死掉后自动重启
+改zabbix权限 /etc/sudoers
+zabbix ALL=(ALL) NOPASSWD: ALL
+
+su - zabbix -s /bin/bash
+systemctl restart nginx
+
+----- script -----
+Hostname=nginx.[*] 搭配脚本:
+#! /bin/sh
+case $1 in
+active)
+curl -s 127.0.0.1/nginx_status | awk ' NR == 1{print $NF}'
+
+accepts)
+curl -s 127.0.0.1/nginx_status | awk 'NR == 3{print $1}'
+;;
+handled)
+curl -s 127.0.0.1/nginx_status | awk ' NR == 3{print $2}'
+;;
+requests)
+curl -s 127.0.0.1/nginx_status | awk ' NR == 3{print $3}'
+
+..*
+
+echo "Usage: $0 [active | accepts | handled | requests]"
+
+esac
+
+----- SNMP -----
+简单网络管理协议（SNMP）
+监控网络设备: 路由 交换机
+snmpv1不支持加密
+snmpv2有加密
+snmpv3增强加密，太慢
+
+yum -y install net-snmp
+/etc/snmp/snmpd.conf
+snmpwalk -v2c -c public <IP> <OID>
+从网上找snmpold对应表
+
+----- 自动发现 -----
+扫描速度慢，压力大
+模板不同还需要手动配置
+一个网段有多种设备，多种业务，但自动时默认只识别一类。
+ip范围实例: 172.16.1.5-172.16.1.10
+
+----- 自动注册 -----
+配置文件这一行
+ServerActive=
+要用不同的
+主动上报
+
+----- 分布式监控 -----
+zabbix proxy 代替zabbix server 收集性能，分担压力
+开几个 zabbix_proxy 让这几个代理干活，最后收集。
+aliyun就有 proxy的安装包
+
+

@@ -1,3 +1,10 @@
+read -p "xxx" a b
+
+#! /bin/bash
+read -p"请输入要检测的域名:"url
+ping -c1 -W1 $url &>/dev/null
+[ $? -eq 0 ] && echo "$url 通"||echo "$url 不通”
+
 💵0 文件名
 💵1 传参第一
 💵_ 传参最后
