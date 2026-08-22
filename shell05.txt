@@ -1,0 +1,185 @@
+expect 
+1, 独立的语言
+2, 需要安装
+3, .exp .ex
+-------------------------
+spawn
+expect
+set
+exp_continue
+[lindex $argv 0]
+[lindex $argv 1]
+set timeout -1
+set timeout 30
+interact
+expect eof
+-------------------------
+[root@practice ~]# cat ssh.exp 
+#!/usr/bin/expect
+spawn ssh root@127.0.0.1 -p 2222
+
+expect {
+  "yes/no" { send "yes\r"; exp_contine }
+  "password:" { send "1\r" };
+}
+-------------------------
+[root@practice ~]# cat ssh2.exp 
+#!/usr/bin/expect
+set ip 127.0.0.1
+set user root
+set passwd 1
+set timeout 5
+
+spawn ssh $user@$ip
+
+expect {
+  "yes/no" { send "yes\r"; exp_continue }
+  "password:" { send "$password\r" };
+}
+
+interact
+-------------------------
+据说这个expect做好笔记就行，用的时候取。
+--------- 数组 ---------
+数组 索引 值
+普通数组 数字做索引
+关联数组 字符做索引
+unset 取消变量/数组
+array[0]=10.0.0.7
+array[1]=10.0.0.8
+array[2]=10.0.0.9
+--------- 默认，一次性定义多个值 ---------
+array=(10.0.0.7 10.0.0.8 10.0.0.9)
+[root🥒ansible ~]# echo ${array[*]}
+172.16.1.7 172.16.1.8
+
+--------- 感叹号取索引 ---------
+[root🥒ansible ~]# echo ${!array[*]}
+0 1
+
+--------- 自定义索引 ---------
+[root🥒ansible ~]#array=(1 [3]=321 [9]=123)
+[root🥒ansible ~]#echo ${!array[*]})
+0 3 9
+[root🥒ansible ~]#echo ${array[*]})
+1 321 123
+
+--------- 遍历数组 ---------
+[root🥒ansible ~]# for i in "${array[@]}";do echo $i;done
+
+--------- 数组存储命令结果 ---------
+[root🥒ansible shell_script]# unset array
+[root🥒ansible shell_script]# array=($(ls))
+[root🥒ansible shell_script]# echo ${array[@]}
+a.sh b.sh c.sh dnsScan.sh d.sh e.sh f.sh g.sh h.sh i.sh j.sh jumpserver.sh k.sh l.sh ping2.sh ping.sh
+
+--------- 关联数组 ---------
+这时候可以用字符串作为索引
+unset array
+declare -A array
+array[index1]=a
+array[index2]=b
+array[index3]=c
+array[index4]=d
+[root🥒ansible shell_script]# echo ${array[@]}
+d a b c
+[root🥒ansible shell_script]# echo ${!array[@]}
+index4 index1 index2 index3
+
+--------- 查看系统的关联数组 ---------
+declare -a
+其实不一定要用，但是要能看懂别人写的。
+--------- for统计 ---------
+#!/bin/bash
+declare -A sex
+for i in $(cat tmp);do
+  let sex[$i]++
+done
+for i in $(echo ${!sex[@]});do
+  echo $i 出现 ${sex[$i]} 次
+done
+--------- while骚操作, 整行读取 ---------
+#!/bin/bash
+declare -A IP
+while read line;do
+
+done</var/log/nginx/access.log
+--------- while骚操作2 ---------[root🥒ansible shell_script]# cat o.sh 
+#!/bin/bash
+declare -A IP
+while read line;do
+  ip=$(echo $line|awk '{print $1}')
+  let IP[$ip]++
+done</var/log/nginx/access.log
+for i in $(echo ${!IP[@]});do
+  echo $i have ${IP[$i]} 次
+done
+--------- while骚操作3 练习 ---------
+[root@practice shell_script]# cat h.sh 
+#!/bin/bash
+declare -A IP
+while read line;do
+  ip=$(echo $line|awk '{print $1}')
+  let IP[$ip]++
+#done</tmp_ip
+done</var/log/nginx/access.log
+for i in ${!IP[@]};do
+  echo $i have ${IP[$i]}
+done
+1，line是自己定义的变量
+2，IP在let时自动赋值的
+3，ip和IP是两个变量
+4，vim似乎有个转换大小写的快捷键
+5，数组读取时用${}，写入时直接用
+
+--------- 用文件存储大量不重复变量 ---------
+[root🥒ansible shell_script]# vim p.sh 
+  1 #!/bin/bash
+  2 declare -A NAME
+  3 count=$(cat id_tmp|wc -l)
+  4 while true;do
+  5   id=$(echo $((RANDOM%100+1)))
+  6   if [ $count -lt 100 ];then
+  7     if [ $(grep -w $id id_tmp|wc -l) -ge 1 ];then
+  8       continue
+  9     fi
+ 10   else
+ 11     echo "已经满了"
+ 12     exit
+ 13   fi
+ 14   read -p "你的名字: " name
+ 15   echo "$name $id" | tee -a "id_tmp"
+ 16 done
+sort -rnk2 id_tmp|head
+
+--------- 练习 ---------
+[root🥒ansible shell_script]# cat p2.sh 
+#!/bin/bash
+#1,不重id
+#2,用文本查重
+#3,要对应指定name和id
+#4,要随机数id
+while true;do
+read -p "你的名字: " name
+[ -z $name ] && continue
+[ ! -e tmp_shell_p2 ] && touch tmp_shell_p2
+id=$(($RANDOM%100+1))
+if [ $name = ok ];then
+  exit
+fi
+if [ $(awk '{print $1}' tmp_shell_p2|grep -w $id) ];then
+  continue
+fi
+
+echo $id $name 
+echo $id $name >> tmp_shell_p2
+if [ $(cat tmp_shell_p2|wc -l) -gt 70 ];then
+  echo "已经满员了"
+  exit
+fi
+done
+
+--------- 反向破解MD5 ---------
+随机65535中其中任意一个数字进行md5加密
+取前几位比对，成功后输出结果
+md5sum
